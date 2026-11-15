@@ -2,7 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 import { fakeAmo } from "../testing/fake-amo.js"
-import { amo } from "../testing/harness.js"
+import { amo, signedIn } from "../testing/harness.js"
 
 const config = join(process.env.AMO_CONFIG_DIR ?? "", "config.json")
 const permit = (permissions: Record<string, string>) => {
@@ -75,6 +75,23 @@ describe("api call", () => {
     permit({ "api.talks": "allow" })
     const allowed = await amo(["work", "api", "call", "GET /api/v4/talks", "--json"], { account })
     expect(allowed.json().item).toMatchObject({ status: 204 })
+  })
+
+  it("refuses a denied call without reading the sign-in (WC-PERM-23)", async () => {
+    const reads: string[] = []
+    const keyring = {
+      ...signedIn(),
+      get: (_service: string, name: string) => {
+        reads.push(name)
+        return null
+      },
+    }
+    permit({ "api.leads": "deny" })
+    for (const args of [["GET /api/v4/leads"], ["PATCH /api/v4/leads", "--body", '[{"id":301,"price":5}]', "--yes"]]) {
+      const ran = await amo(["work", "api", "call", ...args, "--json"], { keyring })
+      expect(ran.json()).toMatchObject({ error: { code: "permission_error" } })
+    }
+    expect(reads).toEqual([])
   })
 
   it("checks the key of the command that reads the same records", async () => {
