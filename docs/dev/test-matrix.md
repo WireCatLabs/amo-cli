@@ -7,7 +7,7 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**69 ✅ · 24 ⛔ · 0 ❌** — 33 commands, 60 options.
+**149 ✅ · 45 ⛔ · 0 ❌** — 70 commands, 124 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
@@ -15,11 +15,112 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `commands info` |  | ✅ |  |
 | `session start` |  | ✅ |  |
 | `session start` | `--host` | ✅ |  |
+| `session start` | `--client-id` | ✅ |  |
 | `session start` | `--credential-storage` | ✅ |  |
 | `session status` |  | ✅ |  |
 | `session status` | `--check` | ✅ |  |
 | `session end` |  | ✅ |  |
 | `session list` |  | ✅ |  |
+| `sync` |  | ✅ |  |
+| `sync` | `--rescan` | ✅ |  |
+| `sync` | `--max-pages` | ✅ |  |
+| `store status` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store apply` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store apply` | `--yes` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store info` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store check` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store migrate` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store rebuild` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store backup` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store backup` | `--encrypt` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store restore` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store decrypt` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store decrypt` | `--output` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store repair` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store repair` | `--dry-run` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store reset` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store reset` | `--no-backup` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store reset` | `--dry-run` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store copies delete` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store tables list` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store recover` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store recover run` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `deals list` |  | ✅ |  |
+| `deals list` | `--limit` | ✅ |  |
+| `deals list` | `--page` | ✅ |  |
+| `deals list` | `--format` | ✅ |  |
+| `deals show` |  | ✅ |  |
+| `deals create` |  | ✅ |  |
+| `deals create` | `--title` | ✅ |  |
+| `deals create` | `--pipeline` | ✅ |  |
+| `deals create` | `--stage` | ✅ |  |
+| `deals create` | `--amount` | ✅ |  |
+| `deals create` | `--currency` | ✅ |  |
+| `deals create` | `--close-date` | ✅ |  |
+| `deals create` | `--owner` | ✅ |  |
+| `deals create` | `--field` | ✅ |  |
+| `deals update` |  | ✅ |  |
+| `deals update` | `--title` | ✅ |  |
+| `deals update` | `--pipeline` | ✅ |  |
+| `deals update` | `--stage` | ✅ |  |
+| `deals update` | `--amount` | ✅ |  |
+| `deals update` | `--currency` | ✅ |  |
+| `deals update` | `--close-date` | ✅ |  |
+| `deals update` | `--owner` | ✅ |  |
+| `deals update` | `--field` | ✅ |  |
+| `deals move` |  | ✅ |  |
+| `deals close` |  | ✅ |  |
+| `deals close` | `--reason` | ✅ |  |
+| `pipelines list` |  | ✅ |  |
+| `pipelines show` |  | ✅ |  |
+| `stages list` |  | ✅ |  |
+| `people list` |  | ✅ |  |
+| `people list` | `--limit` | ✅ |  |
+| `people list` | `--page` | ✅ |  |
+| `people list` | `--format` | ✅ |  |
+| `people show` |  | ✅ |  |
+| `people create` |  | ✅ |  |
+| `people create` | `--name` | ✅ |  |
+| `people create` | `--first-name` | ✅ |  |
+| `people create` | `--last-name` | ✅ |  |
+| `people create` | `--position` | ✅ |  |
+| `people create` | `--owner` | ✅ |  |
+| `people create` | `--field` | ✅ |  |
+| `people update` |  | ✅ |  |
+| `people update` | `--name` | ✅ |  |
+| `people update` | `--first-name` | ✅ |  |
+| `people update` | `--last-name` | ✅ |  |
+| `people update` | `--position` | ✅ |  |
+| `people update` | `--owner` | ✅ |  |
+| `people update` | `--field` | ✅ |  |
+| `organizations list` |  | ✅ |  |
+| `organizations list` | `--limit` | ✅ |  |
+| `organizations list` | `--page` | ✅ |  |
+| `organizations list` | `--format` | ✅ |  |
+| `organizations show` |  | ✅ |  |
+| `organizations create` |  | ✅ |  |
+| `organizations create` | `--name` | ✅ |  |
+| `organizations create` | `--owner` | ✅ |  |
+| `organizations create` | `--field` | ✅ |  |
+| `organizations update` |  | ✅ |  |
+| `organizations update` | `--name` | ✅ |  |
+| `organizations update` | `--owner` | ✅ |  |
+| `organizations update` | `--field` | ✅ |  |
+| `users list` |  | ✅ |  |
+| `users list` | `--limit` | ✅ |  |
+| `users list` | `--page` | ✅ |  |
+| `users show` |  | ✅ |  |
+| `fields list` |  | ✅ |  |
+| `fields list` | `--limit` | ✅ |  |
+| `fields list` | `--page` | ✅ |  |
+| `fields list` | `--all` | ✅ |  |
+| `search all` |  | ✅ |  |
+| `search all` | `--only` | ✅ |  |
+| `search all` | `--source` | ✅ |  |
+| `search all` | `--limit` | ✅ |  |
+| `search all` | `--page` | ✅ |  |
+| `search all` | `--exact` | ✅ |  |
+| `search all` | `--timezone` | ✅ |  |
 | `api list` |  | ✅ |  |
 | `api show` |  | ✅ |  |
 | `api call` |  | ✅ |  |

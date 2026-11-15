@@ -32,7 +32,7 @@
         "session",
         "start"
       ],
-      "summary": "sign in to an amoCRM or Kommo account with a long-lived token",
+      "summary": "sign in to amoCRM or Kommo with a long-lived token or your own integration",
       "effects": {
         "remote": "read",
         "local": "write"
@@ -54,7 +54,7 @@
         "session",
         "end"
       ],
-      "summary": "forget this profile's token on this computer",
+      "summary": "forget this profile's sign-in on this computer",
       "effects": {
         "remote": "none",
         "local": "write"
@@ -70,6 +70,487 @@
         "remote": "none",
         "local": "read"
       }
+    },
+    {
+      "path": [
+        "sync"
+      ],
+      "summary": "bring the CRM's copy in the local store up to date: pipelines, companies,…",
+      "effects": {
+        "remote": "read",
+        "local": "write"
+      },
+      "permission": "sync",
+      "entity": "crm_sync"
+    },
+    {
+      "path": [
+        "store",
+        "status"
+      ],
+      "summary": "how far each kind's sync is: rows saved, partial or complete, when it last…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "store.status",
+      "entity": "crm_sync_progress"
+    },
+    {
+      "path": [
+        "store",
+        "apply"
+      ],
+      "summary": "apply scope mine to the contacts already stored: remove those no deal or…",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.apply",
+      "entity": "crm_contacts_removed"
+    },
+    {
+      "path": [
+        "store",
+        "info"
+      ],
+      "summary": "the shared store's format, size and contents, and whether this tool can read it",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "store.info",
+      "entity": "store_info"
+    },
+    {
+      "path": [
+        "store",
+        "check"
+      ],
+      "summary": "check the local store for problems",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "store.check",
+      "entity": "store_check"
+    },
+    {
+      "path": [
+        "store",
+        "migrate"
+      ],
+      "summary": "migrate an older local store",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.migrate",
+      "entity": "store_migration"
+    },
+    {
+      "path": [
+        "store",
+        "rebuild"
+      ],
+      "summary": "rebuild the local store's search indexes",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.rebuild",
+      "entity": "store_reindex"
+    },
+    {
+      "path": [
+        "store",
+        "backup"
+      ],
+      "summary": "copy the store into a new file, while it is in use; never overwrites a file",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.backup",
+      "entity": "store_backup"
+    },
+    {
+      "path": [
+        "store",
+        "restore"
+      ],
+      "summary": "restore a backup and keep the current store, or roll back a breaking upgrade",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.restore",
+      "entity": "store_restore"
+    },
+    {
+      "path": [
+        "store",
+        "decrypt"
+      ],
+      "summary": "open a file written with --encrypt into a new file; asks for its password",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.decrypt",
+      "entity": "store_decrypt"
+    },
+    {
+      "path": [
+        "store",
+        "repair"
+      ],
+      "summary": "repair table shapes while keeping the old tables",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.repair",
+      "entity": "store_repair"
+    },
+    {
+      "path": [
+        "store",
+        "reset"
+      ],
+      "summary": "back up the local store and replace it with an empty one",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.reset",
+      "entity": "store_reset"
+    },
+    {
+      "path": [
+        "store",
+        "copies",
+        "delete"
+      ],
+      "summary": "delete one copy `store repair` kept, named exactly; refuses any other table",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.copies.delete",
+      "entity": "store_copy_removal"
+    },
+    {
+      "path": [
+        "store",
+        "tables",
+        "list"
+      ],
+      "summary": "every table of the local archive, with its kind and row count",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "store.tables.list",
+      "entity": "store_table"
+    },
+    {
+      "path": [
+        "store",
+        "recover"
+      ],
+      "summary": "what is damaged in the store and how to recover it",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "store.recover"
+    },
+    {
+      "path": [
+        "store",
+        "recover",
+        "run"
+      ],
+      "summary": "rebuild a damaged store from every row it can read",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "store.recover.run"
+    },
+    {
+      "path": [
+        "deals",
+        "list"
+      ],
+      "summary": "deals copied from the CRM, newest first; run sync to bring them up to date",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "deals.list",
+      "entity": "deal"
+    },
+    {
+      "path": [
+        "deals",
+        "show"
+      ],
+      "summary": "one deal with its pipeline, stage, status, amount and the people on it, and…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "deals.show",
+      "entity": "deal"
+    },
+    {
+      "path": [
+        "deals",
+        "create"
+      ],
+      "summary": "make a deal in the CRM, then store the CRM's copy of it",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "deals.create",
+      "entity": "crm_write"
+    },
+    {
+      "path": [
+        "deals",
+        "update"
+      ],
+      "summary": "change a deal in the CRM; what is left out keeps its value; the CRM's copy…",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "deals.update",
+      "entity": "crm_write"
+    },
+    {
+      "path": [
+        "deals",
+        "move"
+      ],
+      "summary": "move a deal to another stage of its pipeline; a won or lost stage checks the…",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "deals.move",
+      "entity": "crm_write"
+    },
+    {
+      "path": [
+        "deals",
+        "close"
+      ],
+      "summary": "mark a deal won or lost, the CRM's own way",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "deals.close",
+      "entity": "crm_write"
+    },
+    {
+      "path": [
+        "pipelines",
+        "list"
+      ],
+      "summary": "pipelines copied from the CRM, with their stages in order and how many are…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "pipelines.list",
+      "entity": "pipeline"
+    },
+    {
+      "path": [
+        "pipelines",
+        "show"
+      ],
+      "summary": "one pipeline as a board and a funnel: how many stand in each stage and their…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "pipelines.show",
+      "entity": "pipeline"
+    },
+    {
+      "path": [
+        "stages",
+        "list"
+      ],
+      "summary": "every stage of the CRM's pipelines in order, with its outcome and how many…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "stages.list",
+      "entity": "stage"
+    },
+    {
+      "path": [
+        "people",
+        "list"
+      ],
+      "summary": "contacts in the CRM, newest first; another client is found here, never in…",
+      "effects": {
+        "remote": "read",
+        "local": "read"
+      },
+      "permission": "people.list",
+      "entity": "crm_person"
+    },
+    {
+      "path": [
+        "people",
+        "show"
+      ],
+      "summary": "one of the CRM's contacts, read live, with its phones and e-mails; one that…",
+      "effects": {
+        "remote": "read",
+        "local": "read"
+      },
+      "permission": "people.show",
+      "entity": "crm_person"
+    },
+    {
+      "path": [
+        "people",
+        "create"
+      ],
+      "summary": "make a person in the CRM, then store the CRM's copy of it",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "people.create",
+      "entity": "crm_record_write"
+    },
+    {
+      "path": [
+        "people",
+        "update"
+      ],
+      "summary": "change a person in the CRM; what is left out keeps its value; the CRM's copy…",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "people.update",
+      "entity": "crm_record_write"
+    },
+    {
+      "path": [
+        "organizations",
+        "list"
+      ],
+      "summary": "companies in the CRM, newest first; another client is found here, never in…",
+      "effects": {
+        "remote": "read",
+        "local": "read"
+      },
+      "permission": "organizations.list",
+      "entity": "crm_organization"
+    },
+    {
+      "path": [
+        "organizations",
+        "show"
+      ],
+      "summary": "one of the CRM's companies, read live, with its phones and e-mails; one that…",
+      "effects": {
+        "remote": "read",
+        "local": "read"
+      },
+      "permission": "organizations.show",
+      "entity": "crm_organization"
+    },
+    {
+      "path": [
+        "organizations",
+        "create"
+      ],
+      "summary": "make a organization in the CRM, then store the CRM's copy of it",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "organizations.create",
+      "entity": "crm_record_write"
+    },
+    {
+      "path": [
+        "organizations",
+        "update"
+      ],
+      "summary": "change a organization in the CRM; what is left out keeps its value; the…",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "organizations.update",
+      "entity": "crm_record_write"
+    },
+    {
+      "path": [
+        "users",
+        "list"
+      ],
+      "summary": "the CRM's users, read live, in the CRM's order",
+      "effects": {
+        "remote": "read",
+        "local": "read"
+      },
+      "permission": "users.list",
+      "entity": "crm_user"
+    },
+    {
+      "path": [
+        "users",
+        "show"
+      ],
+      "summary": "one of the CRM's users, read live",
+      "effects": {
+        "remote": "read",
+        "local": "read"
+      },
+      "permission": "users.show",
+      "entity": "crm_user"
+    },
+    {
+      "path": [
+        "fields",
+        "list"
+      ],
+      "summary": "the CRM's custom fields of one kind, in its order, with a list field's options",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "fields.list",
+      "entity": "crm_field"
+    },
+    {
+      "path": [
+        "search",
+        "all"
+      ],
+      "summary": "search stored deals and leads, messages, notes, calendar events and meetings",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "search.all",
+      "entity": "hit"
     },
     {
       "path": [
@@ -367,6 +848,75 @@
     }
   ],
   "entities": {
+    "store_table": {
+      "fields": [
+        "name",
+        "kind",
+        "rows",
+        "bytes"
+      ]
+    },
+    "deal": {
+      "fields": [
+        "status",
+        "organization"
+      ]
+    },
+    "pipeline": {
+      "fields": [
+        "kind"
+      ]
+    },
+    "stage": {
+      "fields": [
+        "kind"
+      ]
+    },
+    "crm_person": {
+      "fields": [
+        "id",
+        "name",
+        "first_name",
+        "last_name",
+        "position",
+        "organization_ids",
+        "assigned_to",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "crm_organization": {
+      "fields": [
+        "id",
+        "name",
+        "type",
+        "own",
+        "person_ids",
+        "assigned_to",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "crm_user": {
+      "fields": [
+        "id",
+        "name",
+        "email",
+        "position",
+        "active",
+        "department_ids"
+      ]
+    },
+    "crm_field": {
+      "fields": [
+        "code",
+        "label",
+        "type",
+        "multiple",
+        "filterable",
+        "untrusted"
+      ]
+    },
     "api_operation": {
       "fields": [
         "effect",
@@ -409,6 +959,7 @@
       "*.amocrm.ru",
       "*.amocrm.com",
       "*.kommo.com",
+      "wirecat.dev",
       "registry.npmjs.org",
       "huggingface.co",
       "*.huggingface.co",
@@ -462,8 +1013,8 @@
       "start"
     ],
     "signIn": {
-      "gives": "Lets your agent read and change the account's CRM with the rights of the administrator who made the token.",
-      "asks": "The account's address and a long-lived token, from a private integration's Keys and scopes tab."
+      "gives": "Lets your agent read and change the account's CRM with the rights of the administrator who made the token, or of the user who signed in through your own integration.",
+      "asks": "The account's address and a long-lived token from a private integration's Keys and scopes tab, or that integration's ID and secret key."
     },
     "skill": {
       "status": [
@@ -533,7 +1084,27 @@
       ]
     },
     "tasks": null,
-    "sync": null,
+    "sync": {
+      "run": [
+        "{profile}",
+        "sync",
+        "--record",
+        "--json"
+      ],
+      "last": [
+        "runs",
+        "list",
+        "command:sync",
+        "status:success",
+        "--limit",
+        "50",
+        "--no-record",
+        "--json"
+      ],
+      "lastShape": "runs",
+      "what": "your deals, contacts and companies",
+      "note": null
+    },
     "storeInfo": null,
     "storeTables": null,
     "storeTableSizes": null,
