@@ -2,7 +2,8 @@
 useDefault = true
 
 [allowlist]
-paths = ['''pnpm-lock\.yaml''']
+# The Kommo reference pages show sample JWTs in their token examples; the file is the vendor's text, never edited.
+paths = ['''pnpm-lock\.yaml''', '''contracts/kommo-openapi\.json''']
 
 # gitleaks' own rules know Google API keys (AIza…) only. Google calls its OAuth tokens opaque, so these prefixes are
 # the observed format, not a promised one: ya29. in Apigee's sample access token, 1// in the sample refresh token of
