@@ -1,4 +1,5 @@
-import { CliError } from "@wirecat/cli-base"
+import { CliError, type SleepLike } from "@wirecat/cli-base"
+import type { FetchLike } from "@wirecat/cli-base/http"
 import {
   type BaseEnvironment,
   baseContext,
@@ -6,31 +7,32 @@ import {
   environmentOf,
   type GlobalFlags,
   ProfileTokenStore,
+  refuseOffline,
 } from "@wirecat/cli-core/cli"
 import { Pacer, pacePathFor } from "@wirecat/cli-core/sends"
 import type { Command } from "commander"
+import { type AmoSignIn, accountOrigin, decodeSignIn } from "./amo/account.js"
+import { AmoTransport } from "./amo/transport.js"
 import { configuration } from "./config.js"
 import { IDENTITY } from "./identity.js"
-import { type CommentsService, commentsService } from "./sample/comments.js"
-import { SERVICE, transport } from "./sample/transport.js"
 
-/** What a test hands `run()` beside cli-core's own: the fake service in place of the network (WC-ARCH-10). */
-export interface ServiceEnvironment extends BaseEnvironment {
-  fetch?: typeof fetch
+/** What a test hands `run()` in place of the account and real waiting (WC-ARCH-10). */
+export interface AmoEnvironment extends BaseEnvironment {
+  fetch?: FetchLike
+  sleep?: SleepLike
 }
 
-// SAMPLE: your service's documented limit; this one is made up.
-const PACE = { perMinute: 120, burst: 20 }
-
 /**
- * Settings, keyring and the run come from cli-core's `baseContext` and nowhere else: a command that resolves settings
- * on its own skips `--timeout`, the run record and the profile's permissions (WC-LIFE-5, WC-LIFE-15).
+ * amoCRM allows 7 requests a second per integration and 50 per account (amocrm.ru developers "Рекомендации"; Kommo
+ * "Limitations" says 7): 5 a second with no burst stays under it in any one-second window.
  */
+export const ACCOUNT_PACE = { perMinute: 300, burst: 1 }
+
 export const contextOf = (command: Command) => {
   const base = baseContext(command, configuration.resolveSettings)
   return {
     ...base,
-    environment: environmentOf<ServiceEnvironment>(command),
+    environment: environmentOf<AmoEnvironment>(command),
     flags: command.optsWithGlobals<GlobalFlags>(),
     profile: base.settings.profile,
     tokens: new ProfileTokenStore({
@@ -42,37 +44,50 @@ export const contextOf = (command: Command) => {
   }
 }
 
-export const refuseOffline = (flags: GlobalFlags) => {
-  if (flags.offline)
-    throw new CliError("permission_error", `this needs ${SERVICE}; leave out --offline`, { reason: "offline.refused" })
-}
-
-/** The service for one run, with the token it was given; `events` comes from `run()`, so each request is recorded. */
-export const serviceFor = (command: Command, token: string, events: EventSink) => {
-  const { environment, env, profile } = contextOf(command)
-  return commentsService(
-    transport({
-      token,
-      events,
-      signal: environment.signal,
-      ...(environment.fetch ? { fetch: environment.fetch } : {}),
-      pacer: new Pacer(pacePathFor(IDENTITY, profile, env), PACE),
-    }),
-  )
-}
-
-/** The profile's saved token, or an authentication error that says how to sign in. Read before any request. */
-export const tokenOf = (command: Command): string => {
-  const { flags, profile, tokens } = contextOf(command)
-  refuseOffline(flags)
-  return tokens.need(profile)
-}
+export const HOST_VARIABLE = `${IDENTITY.envPrefix}_HOST`
 
 /**
- * Every remote call goes through here: inside cli-core's run, so `--timeout` bounds it, a failure or `--record` keeps
- * a run named after the command, and the transport's requests land in that run (WC-LIFE-5, WC-LIFE-15).
+ * `AMO_TOKEN` first, as for every token CLI, with `AMO_HOST` naming its account; then the profile's saved sign-in,
+ * which keeps the address beside the token.
  */
-export const withService = <T>(command: Command, body: (service: CommentsService) => Promise<T>): Promise<T> => {
-  const token = tokenOf(command)
-  return contextOf(command).run((events) => body(serviceFor(command, token, events)))
+export const storedSignIn = (command: Command): AmoSignIn | undefined => {
+  const { env, profile, tokens } = contextOf(command)
+  const stored = tokens.read(profile)
+  if (!stored) return undefined
+  if (stored.source !== "environment") return decodeSignIn(stored.secret)
+  const host = env[HOST_VARIABLE]
+  if (!host)
+    throw new CliError(
+      "configuration_error",
+      `${tokens.variable} needs ${HOST_VARIABLE}, the account's address, such as https://example.amocrm.ru`,
+      { reason: "account.host-missing" },
+    )
+  return { origin: accountOrigin(host), token: stored.secret }
 }
+
+/** The sign-in a request uses, or the "not signed in" refusal that names the command to sign in. */
+export const signInOf = (command: Command): AmoSignIn => {
+  refuseOffline(command, "the amoCRM account")
+  const found = storedSignIn(command)
+  if (found) return found
+  const { profile, tokens } = contextOf(command)
+  tokens.need(profile)
+  throw new CliError("authentication_error", `profile ${profile} is not signed in`)
+}
+
+export const transportFor = (command: Command, signIn: AmoSignIn, events?: EventSink): AmoTransport => {
+  const { environment, env } = contextOf(command)
+  return new AmoTransport({
+    signIn,
+    ...(events ? { events } : {}),
+    ...(environment.fetch ? { fetch: environment.fetch } : {}),
+    ...(environment.signal ? { signal: environment.signal } : {}),
+    ...(environment.sleep ? { sleep: environment.sleep } : {}),
+    // amoCRM counts per integration and account: two profiles on one account share one pace.
+    pacer: new Pacer(pacePathFor(IDENTITY, `account-${new URL(signIn.origin).hostname}`, env), ACCOUNT_PACE),
+  })
+}
+
+/** The body inside core's run: recorded, under `--timeout`, its requests in the run's events (WC-LIFE-17). */
+export const withAccount = <T>(command: Command, body: (account: AmoTransport) => Promise<T>): Promise<T> =>
+  contextOf(command).run((events) => body(transportFor(command, signInOf(command), events)))

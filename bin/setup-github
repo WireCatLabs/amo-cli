@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# The owner's four steps for a new CLI (cli-base docs/standards/new-cli.md, "Four steps that need a person"), for
+# amo-cli: the GitHub repository and its ruleset, the npm environment, the monthly cron minute, and the shared lists.
+# It prints what it will do and asks before anything; nothing runs when the file is sourced.
+#   bin/setup-github
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  echo "run bin/setup-github; sourcing it does nothing" >&2
+  return 1
+fi
+set -euo pipefail
+
+repo=WireCatLabs/amo-cli
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+cli_base=$(cd -- "${CLI_BASE_DIR:-$root/../cli-base}" && pwd)
+cli_core=$(cd -- "${CLI_CORE_DIR:-$root/../cli-core}" && pwd)
+cli_docs=$(cd -- "${CLI_DOCS_DIR:-$root/../cli-docs}" && pwd)
+monthly="$root/.github/workflows/monthly.yml"
+
+# The first free minute between 02:17 and 03:20 UTC in cli-base's list of taken ones (WC-CI-9), three apart from each.
+free_minute() {
+  git -C "$cli_base" fetch -q origin main
+  git -C "$cli_base" show origin/main:docs/standards/ci.md | node -e '
+    const taken = [...require("fs").readFileSync(0, "utf8").matchAll(/^\s*\| (0[23]):([0-5][0-9]) \|/gm)]
+      .map(([, h, m]) => Number(h) * 60 + Number(m))
+    for (let at = 2 * 60 + 17; at <= 3 * 60 + 20; at++)
+      if (taken.every((one) => Math.abs(one - at) >= 3)) {
+        console.log(`${Math.floor(at / 60)} ${at % 60}`)
+        process.exit(0)
+      }
+    process.exit(1)'
+}
+
+read -r hour minute < <(free_minute) || { echo "no free monthly minute left between 02:17 and 03:20" >&2; exit 1; }
+
+cat <<PLAN
+This sets up $repo from $root:
+
+  1. Commit the monthly cron minute $(printf '%02d:%02d' "$hour" "$minute") UTC into $monthly on main.
+  2. Create the public repository $repo, push main, delete merged branches, and add the main ruleset: no deletion,
+     no force push, changes only through a pull request, the required checks, no bypass.
+  3. Create the GitHub environment npm, deployable from main only. npm trusted publishing is yours on npmjs.com
+     once the package exists: publish 0.0.x with $root/bin/release --local, then set the trusted publisher to
+     $repo, workflow release.yml, environment npm.
+  4. Print the three shared-list changes to open as pull requests:
+     $cli_base/src/standards/audit.ts (PARITY_GROUPS), $cli_core/src/cli/help/first-screen.ts (WIRECAT_TOOLS),
+     $cli_docs/tools.json.
+
+It uses your gh login. Nothing is published.
+PLAN
+read -r -p "Go ahead? [y/N] " answer
+[[ "$answer" == "y" || "$answer" == "Y" ]] || { echo "nothing done"; exit 0; }
+
+gh auth status >/dev/null
+
+git -C "$root" switch -q main
+sed -i -E "s/- cron: \"[0-9]+ [0-9]+ 1 \* \*\"/- cron: \"$minute $hour 1 * *\"/" "$monthly"
+if ! git -C "$root" diff --quiet -- "$monthly"; then
+  git -C "$root" commit -q -m "ci: take the monthly minute $(printf '%02d:%02d' "$hour" "$minute") UTC" -- "$monthly"
+fi
+
+gh repo create "$repo" --public --source "$root" --remote origin --description "amoCRM and Kommo CRM for AI agents"
+git -C "$root" push -u origin main
+gh repo edit "$repo" --delete-branch-on-merge
+
+gh api -X POST "repos/$repo/rulesets" --input - >/dev/null <<'RULESET'
+{
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "bypass_actors": [],
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "required_status_checks": [
+          { "context": "standards" },
+          { "context": "changelog / guard" },
+          { "context": "validation / ci / check" },
+          { "context": "validation / ci / bun" },
+          { "context": "validation / ci / secrets" },
+          { "context": "validation / prose" },
+          { "context": "validation / version" },
+          { "context": "validation / node-22" },
+          { "context": "validation / repo-setup" },
+          { "context": "conformance" }
+        ]
+      }
+    }
+  ]
+}
+RULESET
+
+gh api -X PUT "repos/$repo/environments/npm" --input - >/dev/null <<'ENVIRONMENT'
+{ "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true } }
+ENVIRONMENT
+gh api -X POST "repos/$repo/environments/npm/deployment-branch-policies" -f name=main -f type=branch >/dev/null
+
+cat <<LISTS
+
+Done: $repo, its ruleset and the npm environment. Left for pull requests, one each:
+  - $cli_base/src/standards/audit.ts: amo-cli in PARITY_GROUPS "all", and "crm" with bitrix24-cli, differences: no
+    leads, no products.
+  - $cli_base/docs/standards/ci.md: $(printf '%02d:%02d' "$hour" "$minute") | amo-cli in the WC-CI-9 list.
+  - $cli_core/src/cli/help/first-screen.ts: amo in WIRECAT_TOOLS.
+  - $cli_docs/tools.json: amo-cli.
+Then on npmjs.com, after the first $root/bin/release --local: trusted publisher $repo, release.yml, environment npm.
+LISTS

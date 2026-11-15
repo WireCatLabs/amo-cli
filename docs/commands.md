@@ -53,11 +53,11 @@ amo commands info [path]
 
 ## `amo session`
 
-keep this profile's Example Comments token in the OS keyring
+keep this profile's amoCRM token and account address in the OS keyring
 
 ### `amo session start`
 
-sign this profile in: the Example Comments API token is asked hidden or read from stdin, never taken as an argument, checked against the service, and only then kept in the keyring, or in a private file
+sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it
 
 **Changes something on this computer only.**
 
@@ -67,13 +67,14 @@ amo session start [options]
 
 | Option | What it does |
 |---|---|
-| `--credential-storage <storage>` | where the token is kept: keyring, which falls back to a private file by itself, or file. Default: `keyring`. |
+| `--host <address>` | the account's address, such as https://example.amocrm.ru, kept as given. |
+| `--credential-storage <storage>` | where the sign-in is kept: keyring, which falls back to a private file by itself, or file. Default: `keyring`. |
 
-**Example:** `amo personal session start`, `amo personal session start --credential-storage file`
+**Example:** `amo work session start --host https://example.amocrm.ru`, `amo work session start --host https://example.kommo.com --json`
 
 ### `amo session status`
 
-show where this profile's token comes from: AMO_TOKEN, the keyring or a file, never the token; --check asks Example Comments whose token it is
+show which account this profile signs in to and where its token comes from: AMO_TOKEN, the keyring or a file; never the token
 
 ```sh
 amo session status [options]
@@ -81,13 +82,13 @@ amo session status [options]
 
 | Option | What it does |
 |---|---|
-| `--check` | ask Example Comments whether the token still works, and whose it is. |
+| `--check` | ask the account whether the token still works and whose it is: the account, the user and admin. |
 
-**Example:** `amo personal session status`, `amo personal session status --check --json`
+**Example:** `amo work session status`, `amo work session status --check --json`
 
 ### `amo session end`
 
-forget this profile's token on this computer; the token itself stays valid in Example Comments
+forget this profile's token and account address on this computer; the token stays valid in amoCRM, which has no call that revokes one: revoke it on the integration's Keys and scopes tab
 
 **Changes something on this computer only.**
 
@@ -95,11 +96,11 @@ forget this profile's token on this computer; the token itself stays valid in Ex
 amo session end
 ```
 
-**Example:** `amo personal session end`
+**Example:** `amo work session end`
 
 ### `amo session list`
 
-list the profiles on this computer and whether each has a token; picks none
+list the profiles on this computer, whether each has a token and for which account; picks none
 
 ```sh
 amo session list
@@ -107,83 +108,61 @@ amo session list
 
 **Example:** `amo session list`, `amo session list --json`
 
-## `amo comments`
+## `amo api`
 
-read and write comments in Example Comments, the sample service
+see and call the amoCRM API v4 operations directly
 
-### `amo comments list`
+### `amo api list`
 
-list the comments in Example Comments, newest first
+list every operation of the Kommo API reference (amoCRM's API v4) that amo may call, with its permission key, default level and the page it comes from
 
 ```sh
-amo comments list [query] [options]
+amo api list [query]
 ```
 
 | Argument | | What it is |
 |---|---|---|
 | `query` | optional | field:value terms that narrow the list — the fields are below. |
 
-| Option | What it does |
-|---|---|
-| `--limit <n>` | how many to show. |
-| `--page <n>` | which page, starting at 1. |
-| `--all` | every row, no paging. |
+**Returns:** api operation — name, effect, family, summary, permission, default_level, also_checks, source; every field: amo commands info api list
 
-**Returns:** comment — id, text, author, created_at; every field: amo commands info comments list
+**Example:** `amo work api list`, `amo work api list family:leads effect:write`
 
-**Example:** `amo personal comments list`, `amo personal comments list author:u2 --json=id,text`
+### `amo api show`
 
-### `amo comments show`
-
-show one comment in Example Comments
+show what an operation does, the permissions it checks and its reference page; calls nothing
 
 ```sh
-amo comments show <id>
+amo api show <method>
 ```
 
 | Argument | | What it is |
 |---|---|---|
-| `id` | required | the comment's id, as list prints it. |
+| `method` | required | the HTTP verb and path, such as "GET /api/v4/leads", as api list prints it. |
 
-**Returns:** comment — id, text, author, created_at; every field: amo commands info comments show
+**Example:** `amo work api show "PATCH /api/v4/leads/{id}" --json`, `amo work api show "GET /api/v4/leads/42"`
 
-**Example:** `amo personal comments show c1`, `amo personal comments show c1 --json`
+### `amo api call`
 
-### `amo comments create`
-
-post a comment in Example Comments
+call one operation of the Kommo API reference on the signed-in account; it checks api.<path>.<verb>, and the key of the command that reads or writes the same records
 
 **Changes something in the service.**
 
 ```sh
-amo comments create [options]
-```
-
-| Option | What it does |
-|---|---|
-| `--text <text>` | the comment's text. |
-
-**Example:** `amo personal comments create --text "Looks good to me"`, `amo personal comments create --text "Looks good to me" --dry-run`
-
-### `amo comments update`
-
-change the text of your comment in Example Comments
-
-**Changes something in the service.**
-
-```sh
-amo comments update <id> [options]
+amo api call <method> [options]
 ```
 
 | Argument | | What it is |
 |---|---|---|
-| `id` | required | the comment's id, as list prints it. |
+| `method` | required | the HTTP verb and path, such as "GET /api/v4/leads/42", as api list prints it. |
 
 | Option | What it does |
 |---|---|
-| `--text <text>` | the new text. |
+| `--query <json>` | the query parameters as a JSON object, named as the reference does: {"filter[id][]":[1,2]}. |
+| `--body <json>` | the request body as JSON, an array of records for most writes. |
+| `--dry-run` | show every permission this call checks, with its level, and call nothing. |
 
-**Example:** `amo personal comments update c1 --text "Looks good now"`
+**Example:** `amo work api call "GET /api/v4/leads" --query '{"limit":5,"with":"contacts"}'`, `amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run`
 
 ## `amo doctor`
 
@@ -290,7 +269,7 @@ amo mcp serve [options]
 
 | Option | What it does |
 |---|---|
-| `--permission <key=level>` | make a permission stricter for this server only, like comments.create=deny; it never loosens the profile; repeat for more keys. |
+| `--permission <key=level>` | make a permission stricter for this server only, like api.leads=readonly; it never loosens the profile; repeat for more keys. |
 | `--profiles <names\|all>` | serve several profiles from one server instead of one: names, comma-separated, or all for every profile. |
 | `--http` | serve over HTTP on 127.0.0.1 for ChatGPT and Claude in the browser, behind your tunnel; the profile's permissions decide. |
 | `--port <port>` | the local port for --http (default 8765). |
@@ -377,7 +356,7 @@ amo mcp config [options]
 
 | Option | What it does |
 |---|---|
-| `--permission <key=level>` | make a permission stricter for this server only, like comments.create=deny; it never loosens the profile; repeat for more keys. |
+| `--permission <key=level>` | make a permission stricter for this server only, like api.leads=readonly; it never loosens the profile; repeat for more keys. |
 | `--profiles <names\|all>` | serve several profiles from one server instead of one: names, comma-separated, or all for every profile. |
 
 **Example:** `amo personal mcp config`, `amo mcp config --profiles all`
@@ -399,7 +378,7 @@ amo mcp add <client> [options]
 | Option | What it does |
 |---|---|
 | `--allow-writes` | acknowledge that this profile offers writing tools. |
-| `--permission <key=level>` | make a permission stricter for this server only, like comments.create=deny; it never loosens the profile; repeat for more keys. |
+| `--permission <key=level>` | make a permission stricter for this server only, like api.leads=readonly; it never loosens the profile; repeat for more keys. |
 
 **Example:** `amo personal mcp add codex --allow-writes`
 
@@ -413,7 +392,7 @@ amo mcp check [options]
 
 | Option | What it does |
 |---|---|
-| `--permission <key=level>` | make a permission stricter for this server only, like comments.create=deny; it never loosens the profile; repeat for more keys. |
+| `--permission <key=level>` | make a permission stricter for this server only, like api.leads=readonly; it never loosens the profile; repeat for more keys. |
 
 **Example:** `amo personal mcp check`
 

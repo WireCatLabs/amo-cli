@@ -18,11 +18,10 @@ import {
 } from "@wirecat/cli-core/cli"
 import { appUpdate } from "@wirecat/cli-core/update"
 import type { Command } from "commander"
-import { commentsCommand } from "./commands/comments.js"
+import { apiCommand } from "./commands/api.js"
 import { sessionCommand } from "./commands/session.js"
 import { configuration } from "./config.js"
 import { IDENTITY, PACKAGE, SKILL } from "./identity.js"
-import { SERVICE } from "./sample/transport.js"
 
 const update = appUpdate({
   packageName: PACKAGE,
@@ -38,10 +37,16 @@ const update = appUpdate({
 
 const mcpCommand = () =>
   appMcpCommand(IDENTITY, configuration, {
-    name: SERVICE,
-    // SAMPLE: name the kinds of text other people wrote that your answers carry (WC-MCP-11).
-    untrusted: ["comment text", "author names"],
-    permissionExample: "comments.create=deny",
+    name: "amoCRM",
+    untrusted: [
+      "lead, contact and company names",
+      "pipeline and stage names",
+      "names of users",
+      "custom field values, notes and tags",
+      "phone numbers, e-mail addresses and links",
+      "whatever api call returns",
+    ],
+    permissionExample: "api.leads=readonly",
     skill: SKILL,
     signedIn: (profile, env, keyring) =>
       new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) }).signedIn(profile),
@@ -51,10 +56,20 @@ export const definition = (): ProgramDefinition => ({
   app: IDENTITY,
   // The whole object: cli-core refuses a command by its key only when it gets the permission table too.
   configuration,
+  firstScreen: {
+    pitch: "an amoCRM or Kommo account's CRM for scripts and agents, with a permission on every write.",
+    can: [
+      { command: "session status --check", does: "which account and user the token signs in as" },
+      { command: "api list family:leads", does: "every API v4 operation on leads, with its permission and page" },
+      { command: 'api call "GET /api/v4/leads" --query \'{"limit":5}\'', does: "any operation, paced under the limit" },
+      { command: 'api call "PATCH /api/v4/leads/42" --dry-run', does: "every permission a write checks, sent nowhere" },
+    ],
+    start: `${IDENTITY.command} work session start --host https://example.amocrm.ru`,
+  },
   commands: () => [
     commandsCommand(IDENTITY),
     sessionCommand(),
-    commentsCommand(),
+    apiCommand(),
     appDoctorCommand(IDENTITY, configuration, { packageName: PACKAGE }),
     skillCommand(IDENTITY, SKILL),
     mcpCommand(),

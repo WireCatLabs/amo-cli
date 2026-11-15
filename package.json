@@ -1,7 +1,7 @@
 {
   "name": "@wirecat/amo-cli",
   "version": "0.0.0",
-  "description": "A new WireCat CLI, started from cli-template",
+  "description": "Read and change an amoCRM or Kommo account's CRM — deals, contacts, companies — from the terminal, scripts and AI agents",
   "license": "Apache-2.0",
   "author": "Viacheslav Ptsarev",
   "repository": {
@@ -35,8 +35,10 @@
     "test:slow": "vitest run --reporter=json --outputFile=coverage/tests.json >/dev/null; cli-dev slow-tests",
     "test:matrix": "vitest run >/dev/null && pnpm build >/dev/null && pnpm test:matrix:check",
     "test:matrix:check": "cli-dev test-matrix --program scripts/command-program.ts --untested scripts/test-matrix-untested.ts --name amo --check && git diff --exit-code -- docs/dev/test-matrix.md",
-    "generate": "pnpm build && node --experimental-strip-types scripts/commands.ts && cli-dev manifest --program dist/program.js --identity dist/wcat.js",
-    "generate:check": "pnpm build && node --experimental-strip-types scripts/commands.ts --check && cli-dev manifest --program dist/program.js --identity dist/wcat.js --check",
+    "generate": "node --experimental-strip-types scripts/kommo-spec.ts operations && pnpm build && node --experimental-strip-types scripts/commands.ts && cli-dev manifest --program dist/program.js --identity dist/wcat.js",
+    "generate:check": "node --experimental-strip-types scripts/kommo-spec.ts operations --check && pnpm build && node --experimental-strip-types scripts/commands.ts --check && cli-dev manifest --program dist/program.js --identity dist/wcat.js --check",
+    "kommo:operations": "node --experimental-strip-types scripts/kommo-spec.ts operations",
+    "kommo:fetch": "node --experimental-strip-types scripts/kommo-spec.ts fetch",
     "smoke": "node --experimental-strip-types scripts/smoke.ts",
     "smoke:bun": "bun scripts/smoke.ts && bun scripts/sandboxed.ts bun scripts/smoke-bundle.ts",
     "smoke:node": "node --experimental-strip-types scripts/sandboxed.ts node --experimental-strip-types scripts/smoke-bundle.ts",

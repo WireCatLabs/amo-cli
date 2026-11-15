@@ -1,12 +1,15 @@
 import { Readable } from "node:stream"
 import { type KeyringStore, memoryKeyring } from "@wirecat/cli-base"
 import type { RunOptions } from "@wirecat/cli-core/cli"
-import type { ServiceEnvironment } from "../context.js"
+import { encodeSignIn } from "../amo/account.js"
+import type { AmoEnvironment } from "../context.js"
 import { run } from "../program.js"
-import { FAKE_TOKEN, fakeComments } from "./fake-comments.js"
+import { FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, fakeAmo } from "./fake-amo.js"
 
-/** A keyring where profile `personal` is already signed in to the fake service; never the real one (WC-TEST-2). */
-export const signedIn = (): KeyringStore => memoryKeyring({ "amo-cli:token:personal": FAKE_TOKEN })
+export const FAKE_SIGN_IN = encodeSignIn({ origin: FAKE_ORIGIN, token: FAKE_TOKEN, userId: String(FAKE_USER_ID) })
+
+/** A keyring where profile `work` is already signed in to the fake account; never the real one (WC-TEST-2). */
+export const signedIn = (): KeyringStore => memoryKeyring({ "amo-cli:token:work": FAKE_SIGN_IN })
 
 export interface Ran {
   code: number
@@ -16,17 +19,17 @@ export interface Ran {
   json: () => Record<string, unknown>
 }
 
-/** The CLI through its own `run()`, as a person or an agent types it, against the fake service (WC-TEST-6). */
-export const runCli = async (
+/** `amo` through its own `run()`, as a person or an agent types it, against the fake account, with no real waits. */
+export const amo = async (
   argv: string[],
   {
-    service = fakeComments(),
+    account = fakeAmo(),
     keyring = signedIn(),
     stdin,
     env,
     answer,
   }: {
-    service?: ReturnType<typeof fakeComments>
+    account?: { fetch: ReturnType<typeof fakeAmo>["fetch"] }
     keyring?: KeyringStore
     stdin?: string
     env?: NodeJS.ProcessEnv
@@ -36,11 +39,12 @@ export const runCli = async (
 ): Promise<Ran> => {
   const out: string[] = []
   const err: string[] = []
-  const options: RunOptions & ServiceEnvironment = {
+  const options: RunOptions & AmoEnvironment = {
     streams: { data: (text) => out.push(text), diagnostic: (text) => err.push(text) },
     tty: false,
     keyring,
-    fetch: service.fetch,
+    fetch: account.fetch,
+    sleep: async () => {},
     ...(env ? { env: { ...process.env, ...env } } : {}),
     ...(answer ? { answer } : {}),
     ...(stdin === undefined ? {} : { stdin: Object.assign(Readable.from([stdin]), { isTTY: false }) }),
