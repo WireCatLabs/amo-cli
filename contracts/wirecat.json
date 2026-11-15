@@ -1,7 +1,7 @@
 {
   "wcat_manifest": 2,
   "name": "amo",
-  "description": "a new WireCat CLI, started from cli-template",
+  "description": "read and change an amoCRM or Kommo account's CRM",
   "docs_url": "https://github.com/WireCatLabs/amo-cli#readme",
   "package": "@wirecat/amo-cli",
   "bin": "wcat-amo",
@@ -32,7 +32,7 @@
         "session",
         "start"
       ],
-      "summary": "sign in to Example Comments with an API token",
+      "summary": "sign in to an amoCRM or Kommo account with a long-lived token",
       "effects": {
         "remote": "read",
         "local": "write"
@@ -43,7 +43,7 @@
         "session",
         "status"
       ],
-      "summary": "show where this profile's token comes from; never the token",
+      "summary": "show how this profile signs in, and with --check as whom it acts",
       "effects": {
         "remote": "read",
         "local": "read"
@@ -73,53 +73,37 @@
     },
     {
       "path": [
-        "comments",
+        "api",
         "list"
       ],
-      "summary": "list the comments in Example Comments, newest first",
+      "summary": "list the amoCRM API operations, with their permissions",
       "effects": {
-        "remote": "read",
-        "local": "read"
+        "remote": "none",
+        "local": "none"
       },
-      "permission": "comments.list",
-      "entity": "comment"
+      "entity": "api_operation"
     },
     {
       "path": [
-        "comments",
+        "api",
         "show"
       ],
-      "summary": "show one comment in Example Comments",
+      "summary": "show an operation's permissions and source; calls nothing",
       "effects": {
-        "remote": "read",
-        "local": "read"
-      },
-      "permission": "comments.show",
-      "entity": "comment"
+        "remote": "none",
+        "local": "none"
+      }
     },
     {
       "path": [
-        "comments",
-        "create"
+        "api",
+        "call"
       ],
-      "summary": "post a comment in Example Comments",
+      "summary": "call one amoCRM API operation with JSON parameters",
       "effects": {
         "remote": "write",
         "local": "write"
-      },
-      "permission": "comments.create"
-    },
-    {
-      "path": [
-        "comments",
-        "update"
-      ],
-      "summary": "change the text of your comment in Example Comments",
-      "effects": {
-        "remote": "write",
-        "local": "write"
-      },
-      "permission": "comments.update"
+      }
     },
     {
       "path": [
@@ -383,9 +367,10 @@
     }
   ],
   "entities": {
-    "comment": {
+    "api_operation": {
       "fields": [
-        "author"
+        "effect",
+        "family"
       ]
     },
     "run": {
@@ -421,11 +406,20 @@
   },
   "network": {
     "hosts": [
-      "comments.example.invalid"
-    ]
+      "*.amocrm.ru",
+      "*.amocrm.com",
+      "*.kommo.com",
+      "registry.npmjs.org",
+      "huggingface.co",
+      "*.huggingface.co",
+      "*.hf.co",
+      "github.com",
+      "*.githubusercontent.com"
+    ],
+    "user_hosts": "the amoCRM or Kommo account you sign in to, such as example.amocrm.ru"
   },
   "desktop": {
-    "tagline": "A new WireCat CLI, started from cli-template",
+    "tagline": "amoCRM and Kommo CRM: deals, contacts and companies",
     "profiles": {
       "args": [
         "session",
@@ -468,8 +462,8 @@
       "start"
     ],
     "signIn": {
-      "gives": "Lets your agent read and change your account through amo.",
-      "asks": "An API token or key from the service."
+      "gives": "Lets your agent read and change the account's CRM with the rights of the administrator who made the token.",
+      "asks": "The account's address and a long-lived token, from a private integration's Keys and scopes tab."
     },
     "skill": {
       "status": [

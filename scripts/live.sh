@@ -2,8 +2,7 @@
 # The release's live check against the real service (WC-TEST-18, WC-REL-17): a person runs it with a real token on
 # stdin, then records it with `pnpm exec cli-dev live record --script scripts/live.sh`. Every folder is a temporary
 # one and the keyring is out of reach, so nothing touches the owner's store, keyring or settings.
-#   scripts/live.sh < token-file
-# SAMPLE: replace the comments reads with your own commands; checked against the sample, it fails at sign-in.
+#   AMO_LIVE_HOST=https://example.amocrm.ru scripts/live.sh < token-file
 set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
@@ -12,7 +11,8 @@ trap 'rm -rf "$work"' EXIT
 export AMO_CONFIG_DIR="$work/config" AMO_STATE_DIR="$work/state" AMO_CACHE_DIR="$work/cache"
 export MESSAGING_STORE="$work/wirecat.db"
 export DBUS_SESSION_BUS_ADDRESS="disabled:"
-unset AMO_TOKEN
+unset AMO_TOKEN AMO_HOST
+host=${AMO_LIVE_HOST:?set AMO_LIVE_HOST to the account address}
 cli=(node "$root/dist/bin/amo.js")
 
 pnpm --dir "$root" -s build >/dev/null
@@ -26,14 +26,19 @@ mkdir -p "$HOME"
   const answer = JSON.parse(require("fs").readFileSync(0, "utf8"))
   if (answer.wcat_describe !== 2 || !/^[0-9a-f]{64}$/.test(answer.manifest_sha256)) throw new Error("not format 2")'
 
-"${cli[@]}" live session start --credential-storage file --json >/dev/null
+"${cli[@]}" live session start --host "$host" --credential-storage file --json >/dev/null
 trap '"${cli[@]}" live session end --json >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 
-"${cli[@]}" live comments list --json >"$work/list.json"
+"${cli[@]}" live session status --check --json >"$work/status.json"
+"${cli[@]}" live api call "GET /api/v4/leads/pipelines" --json >"$work/pipelines.json"
 node -e '
-  const list = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))
-  if (!Array.isArray(list.items)) throw new Error(`no items: ${JSON.stringify(list).slice(0, 200)}`)' "$work/list.json"
+  const fs = require("fs")
+  const status = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).item
+  if (status.verified !== true || !status.account.id) throw new Error("the token was not verified")
+  const pipelines = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).item.result._embedded.pipelines
+  if (!pipelines.every((one) => one._embedded.statuses.some((stage) => stage.id === 142)))
+    throw new Error("a pipeline has no won status 142")' "$work/status.json" "$work/pipelines.json"
 "${cli[@]}" live doctor --json >/dev/null
 
 "${cli[@]}" live session end --json >/dev/null
-echo "live check passed: describe format 2, sign-in, comments list, doctor, sign-out"
+echo "live check passed: describe format 2, sign-in, status --check, pipelines, doctor, sign-out"

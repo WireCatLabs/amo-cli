@@ -39,6 +39,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["src/amo/operations.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
     }
   ]
 }

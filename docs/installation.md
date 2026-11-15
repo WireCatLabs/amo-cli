@@ -7,7 +7,7 @@ npm install -g @wirecat/amo-cli
 amo --version
 ```
 
-Check the installation, then pick a profile name for your account, such as `personal`:
+Check the installation, then pick a profile name for your account, such as `work`:
 
 ```sh
 amo doctor
