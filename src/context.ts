@@ -11,8 +11,9 @@ import {
 } from "@wirecat/cli-core/cli"
 import { Pacer, pacePathFor } from "@wirecat/cli-core/sends"
 import type { Command } from "commander"
-import { type AmoSignIn, accountOrigin, decodeSignIn } from "./amo/account.js"
-import { AmoTransport } from "./amo/transport.js"
+import { accountOrigin, decodeSignIn } from "./amo/account.js"
+import { type AppAuth, appAuthOf } from "./amo/oauth.js"
+import { type AmoAuth, AmoTransport } from "./amo/transport.js"
 import { configuration } from "./config.js"
 import { IDENTITY } from "./identity.js"
 
@@ -20,6 +21,8 @@ import { IDENTITY } from "./identity.js"
 export interface AmoEnvironment extends BaseEnvironment {
   fetch?: FetchLike
   sleep?: SleepLike
+  /** In place of the system browser; a test plays the browser and the relay page. */
+  openBrowser?: (url: string) => Promise<void>
 }
 
 /**
@@ -46,27 +49,40 @@ export const contextOf = (command: Command) => {
 
 export const HOST_VARIABLE = `${IDENTITY.envPrefix}_HOST`
 
+/** The profile's integration sign-in, read with no network. */
+export const appAuthFor = (command: Command): AppAuth | undefined => {
+  const { env, profile, keyring, environment } = contextOf(command)
+  return appAuthOf({
+    env,
+    profile,
+    keyring,
+    ...(environment.fetch ? { fetch: environment.fetch as typeof fetch } : {}),
+    signal: environment.signal,
+  })
+}
+
 /**
- * `AMO_TOKEN` first, as for every token CLI, with `AMO_HOST` naming its account; then the profile's saved sign-in,
- * which keeps the address beside the token.
+ * `AMO_TOKEN` first, as for every token CLI, with `AMO_HOST` naming its account; then the integration's sign-in, then
+ * the saved long-lived token, which keeps the address beside it. One `session start` forgets the other kind.
  */
-export const storedSignIn = (command: Command): AmoSignIn | undefined => {
+export const storedSignIn = (command: Command): AmoAuth | undefined => {
   const { env, profile, tokens } = contextOf(command)
   const stored = tokens.read(profile)
-  if (!stored) return undefined
-  if (stored.source !== "environment") return decodeSignIn(stored.secret)
-  const host = env[HOST_VARIABLE]
-  if (!host)
-    throw new CliError(
-      "configuration_error",
-      `${tokens.variable} needs ${HOST_VARIABLE}, the account's address, such as https://example.amocrm.ru`,
-      { reason: "account.host-missing" },
-    )
-  return { origin: accountOrigin(host), token: stored.secret }
+  if (stored?.source === "environment") {
+    const host = env[HOST_VARIABLE]
+    if (!host)
+      throw new CliError(
+        "configuration_error",
+        `${tokens.variable} needs ${HOST_VARIABLE}, the account's address, such as https://example.amocrm.ru`,
+        { reason: "account.host-missing" },
+      )
+    return { origin: accountOrigin(host), token: stored.secret }
+  }
+  return appAuthFor(command) ?? (stored ? decodeSignIn(stored.secret) : undefined)
 }
 
 /** The sign-in a request uses, or the "not signed in" refusal that names the command to sign in. */
-export const signInOf = (command: Command): AmoSignIn => {
+export const signInOf = (command: Command): AmoAuth => {
   refuseOffline(command, "the amoCRM account")
   const found = storedSignIn(command)
   if (found) return found
@@ -75,7 +91,7 @@ export const signInOf = (command: Command): AmoSignIn => {
   throw new CliError("authentication_error", `profile ${profile} is not signed in`)
 }
 
-export const transportFor = (command: Command, signIn: AmoSignIn, events?: EventSink): AmoTransport => {
+export const transportFor = (command: Command, signIn: AmoAuth, events?: EventSink): AmoTransport => {
   const { environment, env, renderer } = contextOf(command)
   return new AmoTransport({
     signIn,

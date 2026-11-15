@@ -52,13 +52,29 @@ describe("AmoTransport", () => {
     expect(await amo.request({ route: at("GET /api/v4/events") })).toEqual({ status: 204, body: undefined })
   })
 
-  it("maps a refused OAuth access token to oauth.expired, and a long-lived one to session.expired", async () => {
+  it("renews a refused OAuth access token once, and answers a refused long-lived one as session.expired", async () => {
     const oauth = transport({}, "wirecatfake0expired")
-    const signedOauth = new AmoTransport({
-      signIn: { origin: FAKE_ORIGIN, token: "wirecatfake0expired", oauth: true },
+    const asked: boolean[] = []
+    let current = "wirecatfake0expired"
+    const renewed = new AmoTransport({
+      signIn: {
+        origin: FAKE_ORIGIN,
+        userId: "7001",
+        accessToken: async (refresh) => {
+          asked.push(refresh)
+          if (refresh) current = FAKE_TOKEN
+          return current
+        },
+      },
       fetch: oauth.account.fetch,
     })
-    await expect(signedOauth.request({ route: at("GET /api/v4/account") })).rejects.toMatchObject({
+    expect((await renewed.request({ route: at("GET /api/v4/account") })).status).toBe(200)
+    expect(asked).toEqual([false, true, false])
+    const dead = new AmoTransport({
+      signIn: { origin: FAKE_ORIGIN, userId: "7001", accessToken: async () => "wirecatfake0expired" },
+      fetch: oauth.account.fetch,
+    })
+    await expect(dead.request({ route: at("GET /api/v4/account") })).rejects.toMatchObject({
       details: { reason: "oauth.expired" },
     })
     await expect(oauth.amo.request({ route: at("GET /api/v4/account") })).rejects.toMatchObject({

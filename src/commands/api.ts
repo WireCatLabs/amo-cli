@@ -17,7 +17,7 @@ import {
   terminalAsker,
   withQuery,
 } from "@wirecat/cli-core/cli"
-import { CRM_ASSIGN_OTHERS_KEY } from "@wirecat/cli-core/crm"
+import { CRM_ASSIGN_OTHERS_KEY, refuseForeignClientReads } from "@wirecat/cli-core/crm"
 import { levelFor } from "@wirecat/cli-core/sends"
 import { Command } from "commander"
 import * as v from "valibot"
@@ -26,6 +26,7 @@ import type { AmoAnswer, QueryValue } from "../amo/transport.js"
 import { apiDefault, apiKey, assignsOthers, commandKeysOf, employeeRuleOf, readsClients } from "../api-keys.js"
 import { permissions } from "../config.js"
 import { contextOf, storedSignIn, withAccount } from "../context.js"
+import { amoCrmSource } from "../crm/source.js"
 import { IDENTITY } from "../identity.js"
 import { write } from "./write.js"
 
@@ -252,13 +253,11 @@ const callCommand = () =>
       const asked = levels.find(({ level }) => level === "ask")
       if (asked) await terminalAsker(this)(asked.one, { chatId: null, kind: "read", key: asked.one })
       const answer = await withAccount(this, async (account) => {
-        if (readsClients(operation, query) && !(await account.isAdmin()))
-          throw new CliError(
-            "permission_error",
-            `${operation.name} reads contacts or companies, which only the account's administrator reads through api ` +
-              "call: your clients come with sync, and another one with people show or organizations show, 100 a day",
-            { reason: "crm.client-reads-admin-only", sent: false },
-          )
+        await refuseForeignClientReads(
+          amoCrmSource(() => account),
+          readsClients(operation, query),
+          operation.name,
+        )
         return account.request(send)
       })
       renderAnswer(this, outputFor(this), itemOf(shown(answer)))

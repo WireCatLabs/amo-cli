@@ -18,7 +18,9 @@ import {
 } from "@wirecat/cli-core/cli"
 import { appUpdate } from "@wirecat/cli-core/update"
 import type { Command } from "commander"
+import { appSourceOf } from "./amo/oauth.js"
 import { apiCommand } from "./commands/api.js"
+import { crmSharedCommands } from "./commands/crm-shared.js"
 import { sessionCommand } from "./commands/session.js"
 import { configuration } from "./config.js"
 import { IDENTITY, PACKAGE, SKILL } from "./identity.js"
@@ -46,10 +48,16 @@ const mcpCommand = () =>
       "phone numbers, e-mail addresses and links",
       "whatever api call returns",
     ],
-    permissionExample: "api.leads=readonly",
+    permissionExample: "deals.close=deny",
     skill: SKILL,
-    signedIn: (profile, env, keyring) =>
-      new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) }).signedIn(profile),
+    signedIn: (profile, env, keyring) => {
+      if (new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) }).signedIn(profile)) return true
+      try {
+        return appSourceOf(env, profile, keyring) !== undefined
+      } catch {
+        return false
+      }
+    },
   })
 
 export const definition = (): ProgramDefinition => ({
@@ -69,6 +77,7 @@ export const definition = (): ProgramDefinition => ({
   commands: () => [
     commandsCommand(IDENTITY),
     sessionCommand(),
+    ...crmSharedCommands(),
     apiCommand(),
     appDoctorCommand(IDENTITY, configuration, { packageName: PACKAGE }),
     skillCommand(IDENTITY, SKILL),

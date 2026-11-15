@@ -1,12 +1,13 @@
 import { CliError, isCliError, realSleep, type SleepLike } from "@wirecat/cli-base"
 import { type FetchLike, hostFetch, providerWaitMs, readJsonResponse } from "@wirecat/cli-base/http"
 import { apiJson, currentAttempt, type EventSink, providerEvent, providerRequest } from "@wirecat/cli-core/cli"
+import { providerCall } from "@wirecat/cli-core/crm"
 import type { Pacer, TurnOptions } from "@wirecat/cli-core/sends"
 import { type EmployeeRule, employeeRuleOf } from "../api-keys.js"
 import type { AmoSignIn } from "./account.js"
-import { providerCall } from "./call.js"
 import { amoError, isBlock } from "./errors.js"
 import { isRecord } from "./json.js"
+import type { AppAuth } from "./oauth.js"
 import { type Matched, matchOperation, pathOf } from "./operation.js"
 import { ROUTES, type Route } from "./routes.js"
 
@@ -38,8 +39,13 @@ export interface AmoAnswer {
   body: unknown
 }
 
+/** A long-lived token, or the owner's integration, whose access token is renewed by its refresh token. */
+export type AmoAuth = AmoSignIn | AppAuth
+
+const isApp = (auth: AmoAuth): auth is AppAuth => "accessToken" in auth
+
 export interface AmoTransportOptions {
-  signIn: AmoSignIn
+  signIn: AmoAuth
   fetch?: FetchLike
   timeoutMs?: number
   signal?: AbortSignal | undefined
@@ -77,7 +83,7 @@ const EMPLOYEE_REFUSALS: Record<EmployeeRule, string> = {
  * request's own error, whose text may hold the request, is never passed on (tg-cli's Bot API transport, b24's).
  */
 export class AmoTransport {
-  readonly #signIn: AmoSignIn
+  readonly #signIn: AmoAuth
   readonly #fetch: FetchLike
   readonly #timeoutMs: number
   readonly #signal: AbortSignal | undefined
@@ -145,6 +151,7 @@ export class AmoTransport {
             },
           }
         : {}),
+      ...(isApp(this.#signIn) ? { refresh: () => this.#refresh() } : {}),
       send: () => this.#once(route, request, write, ++attempt),
     })
   }
@@ -169,6 +176,14 @@ export class AmoTransport {
       }
     })()
     return this.#admin
+  }
+
+  /** The access token amoCRM refused is renewed once; the keeper saves the rotated refresh token under its lock. */
+  async #refresh(): Promise<boolean> {
+    const auth = this.#signIn
+    if (!isApp(auth)) return false
+    await auth.accessToken(true)
+    return true
   }
 
   async #refuseForEmployee(route: Matched, body: unknown) {
@@ -234,11 +249,13 @@ export class AmoTransport {
       if (value === undefined) continue
       for (const one of Array.isArray(value) ? value : [value]) url.searchParams.append(key, String(one))
     }
+    const auth = this.#signIn
+    const token = isApp(auth) ? await auth.accessToken(false) : auth.token
     try {
       return await this.#fetch(url, {
         method: operation.method,
         headers: {
-          authorization: `Bearer ${this.#signIn.token}`,
+          authorization: `Bearer ${token}`,
           accept: "application/hal+json, application/problem+json, application/json",
           ...(request.body === undefined ? {} : { "content-type": "application/json" }),
         },
@@ -294,7 +311,7 @@ export class AmoTransport {
     const refusal = amoError(operation, response.status, body, {
       json: !confirmed || json,
       waitMs: providerWaitMs(response.headers, () => new Date(this.#now())),
-      ...(this.#signIn.oauth ? { oauth: true } : {}),
+      ...(isApp(this.#signIn) ? { oauth: true } : {}),
     })
     end({ status: response.status, errorCode: refusal.code })
     if (refusal.details.reason === "amo.blocked") await this.#pacer?.holdFor(BLOCK_HOLD_MS)

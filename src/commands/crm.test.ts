@@ -1,0 +1,178 @@
+import { describe, expect, it } from "vitest"
+import { FAKE_COLLEAGUE_ID, type FakeAmo, type FakeAmoOptions, fakeAmo } from "../testing/fake-amo.js"
+import { amo } from "../testing/harness.js"
+
+const account = (options: FakeAmoOptions = {}) => fakeAmo({ perSecond: 10_000, ...options })
+
+interface Listed {
+  items: Record<string, unknown>[]
+  has_more?: boolean
+}
+
+const listed = async (fake: FakeAmo, args: string[]) => {
+  const ran = await amo(["work", ...args, "--json"], { account: fake })
+  expect([args.join(" "), ran.code, ran.err]).toEqual([args.join(" "), 0, ""])
+  return ran.json() as unknown as Listed
+}
+
+const idsOf = (list: Listed, key = "external_id") => list.items.map((one) => String(one[key])).sort()
+
+const sync = async (fake: FakeAmo) => {
+  const ran = await amo(["work", "sync", "--json"], { account: fake })
+  expect([ran.code, ran.err]).toEqual([0, ""])
+  return ran.json()
+}
+
+describe("sync", () => {
+  it.each([
+    ["with the API filter add-on", true],
+    ["without it", false],
+  ])("copies the user's own deals and only their clients, %s", async (_, apiFilter) => {
+    const fake = account({ apiFilter })
+    await sync(fake)
+    // 303 is the colleague's; its contact 403 and company 502 are on no deal of ours.
+    expect(idsOf(await listed(fake, ["deals", "list"]))).toEqual(["301", "302", "304"])
+    const filtered = fake.calls.filter((one) => Object.keys(one.query).some((name) => name.startsWith("filter[")))
+    if (!apiFilter) expect(filtered.every((one) => one.operation === "GET /api/v4/events")).toBe(true)
+    else expect(filtered.some((one) => one.query["filter[responsible_user_id][]"]?.[0] === "7001")).toBe(true)
+    const shown = (await amo(["work", "deals", "show", "deal:1", "--json"], { account: fake })).json()
+    expect(JSON.stringify(shown)).not.toContain("Test Person 3")
+  })
+
+  it("names won and lost by 142 and 143, in the account's currency, and copies both pipelines", async () => {
+    const fake = account()
+    await amo(["work", "config", "set", "crm.amocrm:wirecatfake.amocrm.ru.unassigned", "7001,7002", "--json"], {
+      account: fake,
+    })
+    await sync(fake)
+    const deals = await listed(fake, ["deals", "list"])
+    const byId = Object.fromEntries(deals.items.map((one) => [String(one.external_id), one]))
+    expect(byId["302"]).toMatchObject({ status: "won", amount: "3020.00", currency: "RUB" })
+    expect(byId["303"]).toMatchObject({ status: "lost" })
+    expect(byId["301"]).toMatchObject({ status: "open" })
+    const pipelines = await listed(fake, ["pipelines", "list"])
+    expect(pipelines.items.map((one) => one.name).sort()).toEqual(["Партнёры", "Продажи"])
+  })
+
+  it("takes the changes after its cursor, and marks a deleted deal from the lead_deleted event", async () => {
+    // The source reads the real clock, so the changes are dated after the first round, not on the seed's days.
+    const fake = account()
+    await sync(fake)
+    const now = Date.now()
+    const lead = fake.data.leads.find((one) => one.id === 301)
+    if (!lead) throw new Error("seed")
+    lead.name = "Test lead renamed"
+    lead.updated_at = Math.floor(now / 1000) + 5
+    fake.remove("lead", 304, Math.floor(now / 1000) + 5)
+    const before = fake.calls.length
+    await sync(fake)
+    const second = fake.calls.slice(before)
+    expect(second.some((one) => one.query["filter[updated_at][from]"] !== undefined)).toBe(true)
+    expect(second.some((one) => one.query["filter[type]"]?.[0] === "lead_deleted,lead_restored")).toBe(true)
+    const deals = await listed(fake, ["deals", "list"])
+    expect(idsOf(deals)).toEqual(["301", "302"])
+    expect(deals.items.find((one) => one.external_id === "301")).toMatchObject({ title: "Test lead renamed" })
+  })
+})
+
+describe("people, organizations and users read live", () => {
+  it("lists contacts newest first with phones and e-mails split from the multitext fields", async () => {
+    const fake = account()
+    const list = await listed(fake, ["people", "list"])
+    expect(idsOf(list, "id")).toEqual(["401", "402", "403"])
+    const first = list.items.find((one) => one.id === "401")
+    expect(first).toMatchObject({
+      phones: [{ value: "+7 900 000-00-00", type: "WORK" }],
+      emails: [{ value: "person1@example.test", type: "WORK" }],
+      organization_ids: ["501"],
+      provider_metadata: { "9201": { label: "Примечание", value: "Test note" } },
+    })
+    const read = fake.calls.filter((one) => one.path === "/api/v4/contacts").at(-1)
+    expect(read?.query).toMatchObject({ "order[updated_at]": ["desc"] })
+  })
+
+  it("searches by name with query=, and refuses a filter without the add-on", async () => {
+    const fake = account({ apiFilter: false })
+    const found = await listed(fake, ["organizations", "list", "Company"])
+    expect(idsOf(found, "id")).toEqual(["501", "502"])
+    expect(fake.calls.filter((one) => one.path === "/api/v4/companies").at(-1)?.query.query).toEqual(["Company"])
+    const refused = await amo(["work", "people", "list", "assigned_to:7001", "--json"], { account: fake })
+    expect(refused.json()).toMatchObject({ error: { reason: "amo.filters-off" } })
+  })
+
+  it("shows a non-administrator a foreign contact without its phones and spends one of the day's views", async () => {
+    const fake = account({ admin: false })
+    const list = await listed(fake, ["people", "list"])
+    const foreign = list.items.find((one) => one.id === "403")
+    expect(foreign?.phones).toBeUndefined()
+    expect(list.items.find((one) => one.id === "401")?.phones).toBeDefined()
+    const shown = (await amo(["work", "people", "show", "403", "--json"], { account: fake })).json()
+    expect(shown).toMatchObject({ item: { id: "403", phones: [{ value: "+7 900 000-00-02" }] } })
+  })
+
+  it("lists the users for an administrator, and refuses anyone else as amoCRM does", async () => {
+    expect(idsOf(await listed(account(), ["users", "list"]), "id")).toEqual(["7001", String(FAKE_COLLEAGUE_ID)])
+    const refused = await amo(["work", "users", "list", "--json"], { account: account({ admin: false }) })
+    expect(refused.json()).toMatchObject({ error: { reason: "amo.access-denied" } })
+  })
+})
+
+describe("writes", () => {
+  it("creates a deal, moves it, and closes it lost with a loss reason by name", async () => {
+    const fake = account()
+    await sync(fake)
+    const created = await amo(
+      [
+        "work",
+        "deals",
+        "create",
+        "--title",
+        "WireCat test",
+        "--pipeline",
+        "Продажи",
+        "--amount",
+        "1500",
+        "--currency",
+        "RUB",
+        "--json",
+      ],
+      { account: fake },
+    )
+    expect([created.code, created.err]).toEqual([0, ""])
+    const made = fake.data.leads.at(-1)
+    expect(made).toMatchObject({ name: "WireCat test", price: 1500, pipeline_id: 5001 })
+    const ref = (created.json() as { item: { deal: { ref: string } } }).item.deal.ref
+    const moved = await amo(["work", "deals", "move", ref, "Переговоры", "--json"], { account: fake })
+    expect([moved.code, moved.err]).toEqual([0, ""])
+    expect(made?.status_id).toBe(50012)
+    const closed = await amo(["work", "deals", "close", ref, "lost", "--reason", "дорого", "--json"], {
+      account: fake,
+    })
+    expect([closed.code, closed.err]).toEqual([0, ""])
+    expect(made).toMatchObject({ status_id: 143, loss_reason_id: 8801 })
+    const patches = fake.calls.filter((one) => one.method === "PATCH")
+    expect(patches.map((one) => one.path)).toEqual(["/api/v4/leads", "/api/v4/leads"])
+  })
+
+  it("offers no deals delete: amoCRM's API has no call that deletes a lead", async () => {
+    const ran = await amo(["work", "deals", "delete", "deal:1", "--json"], { account: account() })
+    expect(ran.code).not.toBe(0)
+  })
+
+  it("creates and renames a contact and a company", async () => {
+    const fake = account()
+    const person = await amo(["work", "people", "create", "--first-name", "Anna", "--last-name", "Example", "--json"], {
+      account: fake,
+    })
+    expect([person.code, person.err]).toEqual([0, ""])
+    expect(fake.data.contacts.at(-1)).toMatchObject({ name: "Anna Example", first_name: "Anna" })
+    const company = await amo(["work", "organizations", "create", "--name", "Example LLC", "--json"], { account: fake })
+    expect([company.code, company.err]).toEqual([0, ""])
+    const id = String(fake.data.companies.at(-1)?.id)
+    const renamed = await amo(["work", "organizations", "update", id, "--name", "Example Ltd", "--json"], {
+      account: fake,
+    })
+    expect([renamed.code, renamed.err]).toEqual([0, ""])
+    expect(fake.data.companies.at(-1)?.name).toBe("Example Ltd")
+  })
+})

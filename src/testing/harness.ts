@@ -4,7 +4,7 @@ import type { RunOptions } from "@wirecat/cli-core/cli"
 import { encodeSignIn } from "../amo/account.js"
 import type { AmoEnvironment } from "../context.js"
 import { run } from "../program.js"
-import { FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, fakeAmo } from "./fake-amo.js"
+import { FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, type FakeAmo, fakeAmo } from "./fake-amo.js"
 
 export const FAKE_SIGN_IN = encodeSignIn({ origin: FAKE_ORIGIN, token: FAKE_TOKEN, userId: String(FAKE_USER_ID) })
 
@@ -28,13 +28,16 @@ export const amo = async (
     stdin,
     env,
     answer,
+    openBrowser,
   }: {
     account?: { fetch: ReturnType<typeof fakeAmo>["fetch"] }
     keyring?: KeyringStore
     stdin?: string
     env?: NodeJS.ProcessEnv
     /** The owner's answer to a question; cli-core never asks under --json, so a test of `ask` leaves it out. */
-    answer?: (question: string) => string | null
+    answer?: (question: string) => Promise<string | null> | string | null
+    /** Plays the browser at an OAuth sign-in. */
+    openBrowser?: (url: string) => Promise<void>
   } = {},
 ): Promise<Ran> => {
   const out: string[] = []
@@ -47,9 +50,26 @@ export const amo = async (
     sleep: async () => {},
     ...(env ? { env: { ...process.env, ...env } } : {}),
     ...(answer ? { answer } : {}),
+    ...(openBrowser ? { openBrowser } : {}),
     ...(stdin === undefined ? {} : { stdin: Object.assign(Readable.from([stdin]), { isTTY: false }) }),
   }
   const code = await run(argv, options)
   const text = { out: out.join(""), err: err.join("") }
   return { code, ...text, json: () => JSON.parse(text.out.trim() || text.err.trim()) as Record<string, unknown> }
+}
+
+/** The fake account synced into the test's store; `ref` finds the stored copy's `deal:<n>` of a lead id. */
+export const synced = async (account: FakeAmo = fakeAmo({ perSecond: 10_000 })) => {
+  const ran = await amo(["work", "sync", "--json"], { account })
+  if (ran.code !== 0) throw new Error(`sync failed: ${ran.err}`)
+  const listed = (await amo(["work", "deals", "list", "--json"], { account })).json() as {
+    items: { ref: string; external_id: string }[]
+  }
+  const refs = new Map(listed.items.map((one) => [one.external_id, one.ref]))
+  const ref = (leadId: number) => {
+    const found = refs.get(String(leadId))
+    if (!found) throw new Error(`no stored copy of lead ${leadId}`)
+    return found
+  }
+  return { account, ref }
 }
