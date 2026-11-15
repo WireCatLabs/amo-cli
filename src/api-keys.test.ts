@@ -38,7 +38,7 @@ describe("permission keys", () => {
       const expected = DENIED.test(t)
         ? "deny"
         : one.effect === "read"
-          ? (own.test(t) && t !== "/api/v4/events/{id}") || ownFields.test(t) || pipelines.test(t)
+          ? own.test(t) || ownFields.test(t) || pipelines.test(t)
             ? "allow"
             : "ask"
           : ["roles", "sources", "tasks"].includes(one.family) || one.name === "POST /api/v4/users"
@@ -54,7 +54,7 @@ describe("permission keys", () => {
   it.each([
     ["GET /api/v4/leads", "allow"],
     ["GET /api/v4/events", "allow"],
-    ["GET /api/v4/events/1", "ask"],
+    ["GET /api/v4/events/1", "allow"],
     ["GET /api/v4/leads/notes", "ask"],
     ["GET /api/v4/leads/unsorted", "ask"],
     ["POST /api/v4/leads", "allow"],
@@ -154,6 +154,11 @@ describe("raw reads of clients, which only an administrator makes (SEC-6, NEED-2
     ["GET /api/v4/leads/unsorted", {}, true],
     ["GET /api/v4/leads", { with: "contacts" }, true],
     ["GET /api/v4/events", { with: "contact_name" }, true],
+    ["GET /api/v4/events", {}, true],
+    ["GET /api/v4/events/1", {}, true],
+    ["GET /api/v4/leads/notes", {}, true],
+    ["GET /api/v4/leads/301/notes", {}, true],
+    ["GET /api/v4/leads/notes/1", {}, true],
     ["GET /api/v4/leads", { with: "loss_reason" }, false],
     ["GET /api/v4/leads", {}, false],
     ["GET /api/v4/contacts/custom_fields", {}, false],

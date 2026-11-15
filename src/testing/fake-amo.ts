@@ -381,7 +381,10 @@ const missingIds = (operation: Operation, body: unknown): string[] =>
     : []
 
 const bodyRefusal = (operation: Operation, body: unknown): Response | undefined => {
-  if (body === undefined) return undefined
+  if (body === undefined)
+    return operation.body && operation.method !== "GET" && operation.method !== "DELETE"
+      ? invalid("body", `${operation.name} needs a body`, "NotBlank")
+      : undefined
   if (!operation.body) return invalid("body", `${operation.name} takes no body`)
   const unnamed = missingIds(operation, body)
   if (unnamed.length) return invalid(unnamed, `${operation.name} changes records named by id`, "NotBlank")

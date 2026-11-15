@@ -5,7 +5,7 @@ import type { Pacer, TurnOptions } from "@wirecat/cli-core/sends"
 import { type EmployeeRule, employeeRuleOf } from "../api-keys.js"
 import type { AmoSignIn } from "./account.js"
 import { providerCall } from "./call.js"
-import { amoError } from "./errors.js"
+import { amoError, isBlock } from "./errors.js"
 import { isRecord } from "./json.js"
 import { type Matched, matchOperation, pathOf } from "./operation.js"
 import { ROUTES, type Route } from "./routes.js"
@@ -287,8 +287,12 @@ export class AmoTransport {
     write: boolean,
     end: ReturnType<typeof providerRequest>,
   ): Promise<CliError> {
+    const confirmed =
+      response.status === 403 && !json && operation !== ROUTES.account && isBlock(operation, body, json)
+        ? await this.#blockConfirmed()
+        : true
     const refusal = amoError(operation, response.status, body, {
-      json,
+      json: !confirmed || json,
       waitMs: providerWaitMs(response.headers, () => new Date(this.#now())),
       ...(this.#signIn.oauth ? { oauth: true } : {}),
     })
@@ -299,6 +303,20 @@ export class AmoTransport {
       ...refusal.details,
       retryable: false,
     })
+  }
+
+  /**
+   * A bare 403 is a block only if the account itself, which no right gates, is refused too: no page shows how a
+   * rights refusal of another route looks, and a non-administrator's `users/{id}` may be one (RR-3).
+   */
+  async #blockConfirmed(): Promise<boolean> {
+    try {
+      await this.request({ route: ROUTES.account })
+      return false
+    } catch (error) {
+      if (isCliError(error) && error.details.reason === "amo.blocked") return true
+      throw error
+    }
   }
 
   /** A cut write may have reached amoCRM: never `cancelled`, which a caller would repeat; `providerCall` says so. */

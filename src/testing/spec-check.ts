@@ -30,10 +30,6 @@ const bareOf = (node: SchemaNode): v.GenericSchema => {
       return v.boolean()
     case "array":
       return v.array(schemaOf(node.items))
-    case "union":
-      return v.union(node.of.map((one) => schemaOf(one)))
-    case "allOf":
-      return v.intersect(node.of.map((one) => schemaOf(one)))
     case "object": {
       const names = Object.keys(node.properties)
       if (names.length === 0) return v.record(v.string(), v.unknown())
@@ -47,8 +43,11 @@ const bareOf = (node: SchemaNode): v.GenericSchema => {
         ? v.objectWithRest(entries, schemaOf(node.additionalProperties))
         : v.strictObject(entries)
     }
-    default:
+    case "unknown":
       return v.unknown()
+    default:
+      // No generated schema has a union, an allOf or a ref today; a spec that brings one needs its check written.
+      throw new Error(`the fake has no check for a ${node.type} schema`)
   }
 }
 

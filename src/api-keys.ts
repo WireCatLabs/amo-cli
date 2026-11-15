@@ -55,7 +55,7 @@ const ONE = "(/\\{id\\})?"
 const OWN_READS = [
   `/account`,
   `/(leads|contacts|companies|users|tasks)${ONE}`,
-  `/events`,
+  `/events${ONE}`,
   `/(leads|contacts|companies)/custom_fields${ONE}`,
   `/leads/pipelines${ONE}`,
   `/leads/pipelines/\\{pipeline_id\\}/statuses${ONE}`,
@@ -131,7 +131,7 @@ export const assignsOthers = (operation: Operation, body: unknown, self: () => s
   return named.some((one) => String(one.responsible_user_id) !== me)
 }
 
-/** Where contact data comes back: contacts and companies with their notes and links, and what names or embeds them. */
+/** What names or embeds contacts and companies in another record's answer. */
 const CLIENT_WITH = new Set(["contacts", "companies", "contact_name", "company_name", "customer_name"])
 
 /**
@@ -145,6 +145,9 @@ export const readsClients = (operation: Operation, query: Readonly<Record<string
   const rest = operation.template.slice(PREFIX.length).split("/")
   if ((operation.family === "contacts" || operation.family === "companies") && rest[1] !== "custom_fields") return true
   if (operation.family === "leads" && rest[1] === "unsorted") return true
+  // A call note's `params.phone` is the client's number (Kommo add-notes), and a field-change event carries the new
+  // value, a contact's phone or e-mail included (events-filtration): every note and event read is a client read.
+  if (rest.includes("notes") || operation.family === "events") return true
   const asked = query.with
   const words = (Array.isArray(asked) ? asked : [asked]).flatMap((one) => String(one ?? "").split(","))
   return words.some((one) => CLIENT_WITH.has(one.trim()))

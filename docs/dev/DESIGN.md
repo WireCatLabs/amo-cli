@@ -81,8 +81,9 @@ Languages: ru, en.
   this IP address is forbidden) and 403 (the account is blocked for repeatedly exceeding the requests a second), and
   Kommo's [http-codes](https://developers.kommo.com/docs/http-codes) page shows the block as a bare `403 Forbidden`.
   Neither names the body field. `amo` reads `error_code` at the top (where Kommo's Chats API 403 example puts it) or
-  under `response` (an inference, no page shows it), and also takes any 403 without JSON, and any 403 on
-  `GET /api/v4/account`, which no user right gates (an inference), as a block. A block holds the
+  under `response` (an inference, no page shows it), and takes any 403 on `GET /api/v4/account`, which no user right
+  gates (an inference), as a block. A bare 403 on any other route asks `GET /api/v4/account` once: a block only if
+  that is refused too, else a rights refusal, since no page shows how a non-administrator's refusal looks. A block holds the
   account's pace for a minute, so other `amo` processes stop too.
 
 ### Permissions
@@ -91,9 +92,8 @@ Languages: ru, en.
   `api.leads.id.get`. A path the reference writes with `{entity_type}`, `{entity}` or `{bot}` is spelt out per value
   (`GET /api/v4/contacts/notes`), so `api.contacts=deny` covers a contact's notes and links too.
 - Reads (NEED-2668 A): `allow` for what `amo`'s own commands and sync read: the account, leads, contacts, companies,
-  pipelines and their statuses, the custom fields of those three, users, tasks, and the events list. Every other read
-  asks: notes and events hold calls, SMS and chat text, unsorted holds what forms and mail brought in, and an event's
-  detail is one of them.
+  pipelines and their statuses, the custom fields of those three, users, tasks, and events (the list and one event).
+  Every other read asks: notes hold calls and SMS, and unsorted holds what forms and mail brought in.
 - Writes (WC-PERM-22, as b24's CRM writes): creating and changing a lead, a contact or a company, `leads/complex`
   included, is `allow`; every other write and every delete asks.
 - Denied until the owner allows them, reads too, as whole families: `talks`, `chats`, `contacts.chats`, `bots`,
@@ -132,9 +132,13 @@ Languages: ru, en.
   The quota moves into cli-core; `amo` applies it through the source's `isAdmin?()` and `ownClients?()` hooks when the
   source lands (phase 4).
 - The same rule holds for `api call` now: for anyone but the administrator it refuses a raw read of contacts and
-  companies (their lists, records, notes and links, not their field definitions), of unsorted, and any read whose
-  `with` embeds or names contacts or companies (`crm.client-reads-admin-only`, cli-core's reason, as b24's
-  `readsClients`). A lead's own fields hold its contacts' ids only, so a plain lead read stays open.
+  companies (their lists, records, notes and links, not their field definitions), of unsorted, of any record's notes
+  (a call note's `params.phone` is the client's number, [add-notes](https://developers.kommo.com/reference/add-notes)),
+  of events (a field-change event carries the new value,
+  [events-filtration](https://developers.kommo.com/reference/events-filtration)), and any read whose `with` embeds or
+  names contacts or companies (`crm.client-reads-admin-only`, cli-core's reason, as b24's `readsClients`). A lead's own
+  fields hold its contacts' ids only, so a plain lead read stays open. `--dry-run` lists this rule and the employee
+  rules a call falls under in `admin_only`, without asking the account who signs in.
 - Unsorted (`/api/v4/leads/unsorted`) is not synced; a deal in a `type` 1 status is open in the stage "Unsorted".
 
 ### The fake account
@@ -147,7 +151,8 @@ schemas, which only the tests load. The fake refuses, with amoCRM's 400 `validat
 - a query parameter the operation does not declare, a value of the wrong type (`filter[updated_at][from]=yesterday`),
   a `with` value no page names, a `limit` past 250 (events 100);
 - a body field the schema does not declare, a wrong type, a missing required field, a mass update item without `id`
-  (the contacts, companies and tasks pages leave it out of their schemas), and a body where the operation takes none.
+  (the contacts, companies and tasks pages leave it out of their schemas), a missing body where a write takes one, and
+  a body where the operation takes none.
 
 It refuses an unknown path or method (404), a wrong token (401), a request past 7 a second on a clock the test drives
 (429 with `retry_after`), and answers an empty page with 204. Any operation it has no answer for is a 501, reads too:
@@ -185,6 +190,7 @@ each, four leads, three contacts with `PHONE` and `EMAIL` multitext fields, two 
 - Does the account answer `filter[updated_at]` without the paid filtering add-on? The ru docs call it "Alpha"; the
   sync falls back to ordering by `updated_at` (RISK-2306). Answered by the first live check.
 - What does a non-administrator's 403 on `GET /api/v4/users/{id}` look like? If its body carries `error_code` 403,
-  `amo` reads it as a block and a non-administrator could not sign in. The first live check records it.
+  `amo` reads it as a block and a non-administrator could not sign in. The first live check must use a
+  non-administrator's token too and record that answer.
 - The Kommo reference is Kommo's and the account may be amoCRM's: a ru-only difference would pass the fake and fail
   live (RISK-2308). The first live check is the owner's.

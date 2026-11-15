@@ -84,7 +84,8 @@ export const LIMITS = {
 const CUSTOM_FIELDS = "https://www.amocrm.ru/developers/content/crm_platform/custom-fields"
 
 /**
- * Body fields the merged spec types wrongly, by name wherever they appear. Every write page types
+ * Body fields the merged spec types wrongly, by name at any depth of any body: right for `custom_fields_values`, which
+ * means the same everywhere. Every write page types
  * `custom_fields_values` as a string; the custom-fields page sends an array of `field_id` or `field_code` with
  * `values`, each a `value`, `enum_id` or `enum_code`.
  */

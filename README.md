@@ -75,16 +75,16 @@ amoCRM has no call that revokes a token: revoke it on the integration's Keys and
 Each profile has a permission level for every operation: `allow`, `ask`, `readonly` or `deny`. Its key is the path's
 words and the verb: `GET /api/v4/leads/{id}` is `api.leads.id.get`, so `api.leads=readonly` covers every lead
 operation. What `amo`'s own commands read is allowed (leads, contacts, companies, pipelines, fields, users, the
-account, tasks and the events list), and so are creating and changing leads, contacts and companies. Every other read,
-such as notes, unsorted or an event's detail, asks, and so do other writes and every delete. Conversations, chats,
+account, tasks and events), and so are creating and changing leads, contacts and companies. Every other read,
+such as notes or unsorted, asks, and so do other writes and every delete. Conversations, chats,
 Salesbots, webhooks, widgets, website buttons, calls and switching users on or off are denied, reads too; so are adding
 users and writing tasks, roles and lead sources. `api call` also checks the key of the command that does the same
 thing, such as `deals.update` for `PATCH /api/v4/leads`, and `crm.assign-others`, denied, when a write hands a record,
 a task or a nested contact to another user.
 
 Some things only the account's administrator does through `amo`, whatever the permissions say: deleting, setting a
-field to nothing, unlinking records, and reading contacts and companies through `api call` (your own clients come with
-sync; another one with `people show`, 100 a day).
+field to nothing, unlinking records, and reading contacts, companies, notes and events through `api call` (your own
+clients come with sync; another one with `people show`, 100 a day).
 
 **Over MCP `ask` does not ask: the write goes ahead**, since no one is there to answer. `AMO_READ_ONLY=1` refuses
 every write.

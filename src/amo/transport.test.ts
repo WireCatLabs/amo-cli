@@ -90,6 +90,21 @@ describe("AmoTransport", () => {
     expect(account.calls).toEqual([])
   })
 
+  it("asks the account before calling a bare 403 elsewhere a block (RR-3)", async () => {
+    const bare = () => new Response("<html>403 Forbidden</html>", { status: 403 })
+    const refused = transport({ routes: { "GET /api/v4/users/{id}": bare } })
+    await expect(refused.amo.request({ route: at("GET /api/v4/users/{id}"), ids: { id: 7002 } })).rejects.toMatchObject(
+      { details: { reason: "amo.access-denied" } },
+    )
+    expect(refused.account.calls.map((one) => one.operation)).toEqual(["GET /api/v4/users/{id}", "GET /api/v4/account"])
+    await expect(refused.amo.request({ route: at("GET /api/v4/account") })).resolves.toMatchObject({ status: 200 })
+    const blocked = transport({ blocked: true })
+    await expect(blocked.amo.request({ route: at("GET /api/v4/leads") })).rejects.toMatchObject({
+      details: { reason: "amo.blocked" },
+    })
+    expect(blocked.account.calls.map((one) => one.path)).toEqual(["/api/v4/leads", "/api/v4/account"])
+  })
+
   it("holds every process's pace after a block, so the next call is not sent", async () => {
     const blocked = transport({ blocked: true })
     await expect(blocked.amo.request({ route: at("GET /api/v4/account") })).rejects.toMatchObject({

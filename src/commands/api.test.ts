@@ -199,6 +199,13 @@ describe("api call", () => {
     expect(account.calls).toEqual([])
   })
 
+  it("names in --dry-run that only the administrator reads clients through api call (RR-5)", async () => {
+    const ran = await amo(["work", "api", "call", "GET /api/v4/contacts", "--dry-run", "--json"])
+    expect(ran.json().item).toMatchObject({ admin_only: ["crm.client-reads-admin-only"] })
+    const lead = await amo(["work", "api", "call", "GET /api/v4/leads/1", "--dry-run", "--json"])
+    expect(lead.json().item).toMatchObject({ admin_only: [] })
+  })
+
   it("refuses with --dry-run what the profile denies", async () => {
     const ran = await amo(["work", "api", "call", "POST /api/v4/webhooks", "--body", "{}", "--dry-run", "--json"])
     expect(ran.json()).toMatchObject({
