@@ -54,6 +54,15 @@ describe("sync", () => {
     expect(pipelines.items.map((one) => one.name).sort()).toEqual(["Партнёры", "Продажи"])
   })
 
+  it("syncs when the account's stage history names a colleague's deal, which is not in the copy", async () => {
+    const fake = account()
+    const [first] = fake.data.events
+    if (!first) throw new Error("seed")
+    fake.data.events.push({ ...first, id: "01fakeevent0303", entity_id: 303, created_at: first.created_at + 10 })
+    await sync(fake)
+    expect(idsOf(await listed(fake, ["deals", "list"]))).toEqual(["301", "302", "304"])
+  })
+
   it("takes the changes after its cursor, and marks a deleted deal from the lead_deleted event", async () => {
     // The source reads the real clock, so the changes are dated after the first round, not on the seed's days.
     const fake = account()

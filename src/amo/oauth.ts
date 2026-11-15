@@ -48,7 +48,7 @@ const account = accountTokenCodec(PROVIDER)
  * cli-core's account-bound entry, plus the Redirect URI it was signed in with: every refresh sends the same one, and
  * amoCRM refuses one that differs from the integration's setting (oauth/step-by-step).
  */
-const codec: TokenCodec = {
+export const appCodec: TokenCodec = {
   rotating: true,
   encode: account.encode,
   decode: (raw) => {
@@ -81,7 +81,7 @@ export const appStorage = (
   credentialStorage({
     credentials: credentialsOf(env, keyring, storage),
     account: oauthAccount(PROVIDER, profile),
-    codec,
+    codec: appCodec,
   })
 
 /** Where the integration's sign-in is kept, `keyring` or `file`, and never what. */

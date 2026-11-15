@@ -370,9 +370,9 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       const named = [...(await clientsOf(caller, chosen, from, started))[client]]
       if (linked !== null) {
         const chunk = named.slice(linked, linked + size)
-        // A chosen user's own client changed in this span came with the round already; once is enough.
-        const rows = (await byIds(caller, client, chunk, { with: WITH[client] })).filter(
-          (raw) => !(chosen.includes(ownerOf(raw)) && (from === null || Number(raw.updated_at) >= from)),
+        // The round already kept a chosen user's own client, and after a cursor every named client changed since it.
+        const rows = (await byIds(caller, client, chunk, { with: WITH[client] })).filter((raw) =>
+          from === null ? !chosen.includes(ownerOf(raw)) : Number(raw.updated_at) < from,
         )
         return linked + size < named.length ? next(rows, `${LINKED}${linked + size}`) : ended(rows)
       }

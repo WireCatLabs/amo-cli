@@ -225,11 +225,15 @@ the main pipeline").
 | any user may choose colleagues to sync | only an administrator | only an administrator can read the users |
 | writes take an operation id once | not idempotent | amoCRM stores no `request_id` |
 | a relay page of its own on wirecat.dev | b24's page | amo has none yet (Open) |
+| `hosts` leave out wirecat.dev | name it | the sign-in's code passes through its relay page in the browser; cli-dev's `undeclared-host` asks for it |
+| `schedule` (a sync timer) | not yet | the plan's tree has it; it comes with phase 6's digest (Open) |
+| `account remove` | none | not in the plan's command tree for amo; an open question for the owner |
 
 ## Open
 
 - amo's own relay page on wirecat.dev (cli-docs `public/webhooks/apps/`), with amoCRM in its text and the privacy
   page; until then `RELAY_URL` is b24's.
+- Mount cli-core's `scheduleCommandFor`, as b24's `src/commands/schedule.ts`, so `sync` can run on a timer.
 - cli-base `PARITY_GROUPS` should name amo with b24 among the CRM CLIs; not opened, since this repository is local.
 - How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
 - The event types `contact_deleted`, `company_deleted` and their `_restored` follow the `lead_deleted` pattern; no

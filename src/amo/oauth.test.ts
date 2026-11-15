@@ -10,7 +10,7 @@ import {
   TOKEN_FIELDS,
 } from "../testing/fake-amo.js"
 import { amo } from "../testing/harness.js"
-import { RELAY_URL } from "./oauth.js"
+import { appCodec, RELAY_URL } from "./oauth.js"
 
 /** Plays the browser and the relay page: the owner allows the integration and pastes back what amoCRM sent. */
 const browser = () => {
@@ -81,5 +81,24 @@ describe("signing in through the owner's integration", () => {
     const spec = JSON.parse(readFileSync(new URL("../../contracts/kommo-openapi.json", import.meta.url), "utf8"))
     const body = spec.paths["/oauth2/access_token"].post.requestBody.content["application/json"].schema
     expect(Object.keys(body.properties).sort()).toEqual([...TOKEN_FIELDS].sort())
+  })
+
+  it("keeps the account, the user and the Redirect URI when a refresh writes the rotated token", () => {
+    const client = { clientId: FAKE_CLIENT_ID, clientSecret: FAKE_CLIENT_SECRET }
+    const tokens = (n: number) => ({ accessToken: `a${n}`, refreshToken: `r${n}`, expiresAt: n, scopes: [] })
+    const signedIn = appCodec.encode({
+      tokens: tokens(1),
+      client,
+      signIn: true,
+      extra: { host: FAKE_ORIGIN, userId: "7001", redirectUri: "https://example.test/callback" },
+    })
+    const refreshed = appCodec.decode(appCodec.encode({ tokens: tokens(2), client, previous: signedIn }))
+    expect(appCodec.rotating).toBe(true)
+    expect(refreshed).toMatchObject({
+      tokens: { refreshToken: "r2" },
+      account: { host: FAKE_ORIGIN, userId: "7001" },
+      client,
+      redirectUri: "https://example.test/callback",
+    })
   })
 })
