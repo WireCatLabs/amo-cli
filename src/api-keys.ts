@@ -1,7 +1,9 @@
-import { CRM_ASSIGN_OTHERS_KEY } from "@wirecat/cli-core/crm"
+import type { CrmKind } from "@wirecat/cli-core"
+import { CRM_ASSIGN_OTHERS_KEY, type CrmVerb } from "@wirecat/cli-core/crm"
 import type { Level } from "@wirecat/cli-core/sends"
 import { isRecord } from "./amo/json.js"
-import { OPERATIONS, type Operation } from "./amo/operation.js"
+import { matchOperation, OPERATIONS, type Operation } from "./amo/operation.js"
+import { type AmoKind, ENTITIES } from "./amo/routes.js"
 
 const PREFIX = "/api/v4/"
 
@@ -173,6 +175,16 @@ export const employeeRuleOf = (operation: Operation, body: unknown): EmployeeRul
   if (operation.method !== "PATCH" && operation.method !== "PUT") return undefined
   const changed = recordsOf(body).flatMap((one) => Object.entries(one).filter(([key]) => key !== "id"))
   return changed.some(([, value]) => clears(value)) ? "clear" : undefined
+}
+
+/**
+ * The API key each CRM write also checks, as b24's `crmApiKeys`: `api.leads.patch: deny` stops `deals update` too, since
+ * the command sends that operation.
+ */
+export const crmApiKeys = (kind: CrmKind, verb: CrmVerb): string[] => {
+  const entity = ENTITIES[kind as AmoKind]
+  if (!entity || verb === "remove") return []
+  return [apiKey(matchOperation(verb === "create" ? entity.create : entity.update).operation)]
 }
 
 const COMMAND_KEYS = [

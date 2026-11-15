@@ -17,8 +17,6 @@ export interface AmoSignIn {
   token: string
   /** The token's user, learnt at sign-in; absent for `AMO_TOKEN`. */
   userId?: string
-  /** An OAuth access token, which expires and is refreshed; absent for a long-lived token, which nothing renews. */
-  oauth?: true
 }
 
 /** `https://example.amocrm.ru`, `example.kommo.com/`: the account's origin, or a refusal that quotes nothing back. */
@@ -65,6 +63,5 @@ export const decodeSignIn = (secret: string): AmoSignIn => {
     origin: accountOrigin(value.origin),
     token: value.token,
     ...(typeof value.userId === "string" ? { userId: value.userId } : {}),
-    ...(value.oauth === true ? { oauth: true as const } : {}),
   }
 }
