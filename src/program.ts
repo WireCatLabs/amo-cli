@@ -61,8 +61,8 @@ export const definition = (): ProgramDefinition => ({
     can: [
       { command: "session status --check", does: "which account and user the token signs in as" },
       { command: "api list family:leads", does: "every API v4 operation on leads, with its permission and page" },
-      { command: 'api call "GET /api/v4/leads" --query \'{"limit":5}\'', does: "any operation, paced under the limit" },
-      { command: 'api call "PATCH /api/v4/leads/42" --dry-run', does: "every permission a write checks, sent nowhere" },
+      { command: 'api call "GET /api/v4/leads"', does: "any operation, paced under the limit" },
+      { command: 'api show "PATCH /api/v4/leads/{id}"', does: "every permission a write checks, and its page" },
     ],
     start: `${IDENTITY.command} work session start --host https://example.amocrm.ru`,
   },

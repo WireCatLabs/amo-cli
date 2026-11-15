@@ -70,9 +70,9 @@ describe("command keys a raw call does the same as", () => {
   })
 
   it("checks crm.assign-others when a write hands a record to another user", () => {
-    expect(assignsOthers(op("PATCH /api/v4/leads"), [{ id: 1, responsible_user_id: 9 }], "7001")).toBe(true)
-    expect(assignsOthers(op("PATCH /api/v4/leads"), [{ id: 1, responsible_user_id: 7001 }], "7001")).toBe(false)
-    expect(assignsOthers(op("GET /api/v4/leads"), undefined, "7001")).toBe(false)
-    expect(assignsOthers(op("POST /api/v4/tasks"), [{ responsible_user_id: 9 }], "7001")).toBe(false)
+    expect(assignsOthers(op("PATCH /api/v4/leads"), [{ id: 1, responsible_user_id: 9 }], () => "7001")).toBe(true)
+    expect(assignsOthers(op("PATCH /api/v4/leads"), [{ id: 1, responsible_user_id: 7001 }], () => "7001")).toBe(false)
+    expect(assignsOthers(op("GET /api/v4/leads"), undefined, () => "7001")).toBe(false)
+    expect(assignsOthers(op("POST /api/v4/tasks"), [{ responsible_user_id: 9 }], () => "7001")).toBe(false)
   })
 })

@@ -7,27 +7,25 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**71 ✅ · 24 ⛔ · 0 ❌** — 34 commands, 61 options.
+**69 ✅ · 24 ⛔ · 0 ❌** — 33 commands, 60 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
 | `commands` |  | ✅ |  |
 | `commands info` |  | ✅ |  |
 | `session start` |  | ✅ |  |
+| `session start` | `--host` | ✅ |  |
 | `session start` | `--credential-storage` | ✅ |  |
 | `session status` |  | ✅ |  |
 | `session status` | `--check` | ✅ |  |
 | `session end` |  | ✅ |  |
 | `session list` |  | ✅ |  |
-| `comments list` |  | ✅ |  |
-| `comments list` | `--limit` | ✅ |  |
-| `comments list` | `--page` | ✅ |  |
-| `comments list` | `--all` | ✅ |  |
-| `comments show` |  | ✅ |  |
-| `comments create` |  | ✅ |  |
-| `comments create` | `--text` | ✅ |  |
-| `comments update` |  | ✅ |  |
-| `comments update` | `--text` | ✅ |  |
+| `api list` |  | ✅ |  |
+| `api show` |  | ✅ |  |
+| `api call` |  | ✅ |  |
+| `api call` | `--query` | ✅ |  |
+| `api call` | `--body` | ✅ |  |
+| `api call` | `--dry-run` | ✅ |  |
 | `doctor` |  | ✅ |  |
 | `doctor` | `--online` | ✅ |  |
 | `doctor reports show` |  | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |

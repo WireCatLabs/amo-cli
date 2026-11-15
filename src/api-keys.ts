@@ -84,10 +84,14 @@ export const commandKeysOf = (operation: Operation, body?: unknown): string[] =>
 }
 
 /** The user a write hands its records to, when it names one other than the token's own (`responsible_user_id`). */
-export const assignsOthers = (operation: Operation, body: unknown, self: string | undefined): boolean =>
-  operation.effect !== "read" &&
-  NOUNS[operation.family] !== undefined &&
-  recordsOf(body).some((one) => one.responsible_user_id !== undefined && String(one.responsible_user_id) !== self)
+/** `self` is asked only when a record names a responsible user, so a refused call never reads the sign-in. */
+export const assignsOthers = (operation: Operation, body: unknown, self: () => string | undefined): boolean => {
+  if (operation.effect === "read" || NOUNS[operation.family] === undefined) return false
+  const named = recordsOf(body).filter((one) => one.responsible_user_id !== undefined)
+  if (named.length === 0) return false
+  const me = self()
+  return named.some((one) => String(one.responsible_user_id) !== me)
+}
 
 const COMMAND_KEYS = [
   ...["deals", "people", "organizations"].flatMap((noun) =>

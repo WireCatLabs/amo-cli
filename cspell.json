@@ -4,6 +4,12 @@
   "ignorePaths": ["docs/commands.md", "docs/dev/**"],
   "words": [
     "amo",
+    "amoCRM",
+    "amocrm",
+    "Kommo",
+    "Salesbot",
+    "Salesbots",
+    "Bitrix",
     "whatsapp-cli",
     "tg-cli",
     "max-cli",

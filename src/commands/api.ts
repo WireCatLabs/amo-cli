@@ -147,12 +147,11 @@ const pathWords = (command: Command) => {
 /** Every key the call checks, the command keys it does the same as, and `crm.assign-others` when it hands records on. */
 const keysOf = (command: Command, matched: Matched, body: unknown) => {
   const { operation } = matched
-  const self = storedSignIn(command)?.userId
   return {
     key: apiKey(operation),
     extra: [
       ...commandKeysOf(operation, body),
-      ...(assignsOthers(operation, body, self) ? [CRM_ASSIGN_OTHERS_KEY] : []),
+      ...(assignsOthers(operation, body, () => storedSignIn(command)?.userId) ? [CRM_ASSIGN_OTHERS_KEY] : []),
     ],
   }
 }

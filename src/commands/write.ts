@@ -33,7 +33,6 @@ export const write = async (command: Command, { key, extra = [], defaults = perm
   const lock = readOnlyLockOf(IDENTITY, env)
   if (lock) throw readOnlyRefusal(lock, "change the amoCRM account")
   const operationId = newOperationId()
-  const signIn = signInOf(command)
   const levelOf = (one: string) => levelFor(settings.permissions, one, defaults).level
   const guard = keyedGuard(
     (ask) =>
@@ -51,6 +50,7 @@ export const write = async (command: Command, { key, extra = [], defaults = perm
   )
   const request = { chatId: null, kind: "edit" as const, key, operationId }
   guard.refuse(request)
+  const signIn = signInOf(command)
   let done: Record<string, unknown>
   try {
     done = await guardedWrite(guard, request, () =>
