@@ -1,10 +1,14 @@
-import { changesAuthorityAt, readsOverMcpAt } from "@wirecat/cli-core/cli"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { changesAuthorityAt, type RunOptions, readsOverMcpAt } from "@wirecat/cli-core/cli"
 import { mcpOverStdio, ownCatalogue } from "@wirecat/cli-core/testing"
 import { expect, it } from "vitest"
 import { permissions } from "./config.js"
+import type { AmoEnvironment } from "./context.js"
 import { IDENTITY } from "./identity.js"
 import { createProgram, run } from "./program.js"
-import { amo } from "./testing/harness.js"
+import { fakeAmo } from "./testing/fake-amo.js"
+import { amo, signedIn } from "./testing/harness.js"
 
 it("mcp serve offers search, read and write, and runs a command through the CLI", async () => {
   const mcp = await mcpOverStdio((streams) => run(["work", "mcp", "serve"], { tty: false, ...streams }))
@@ -64,4 +68,28 @@ it("doctor --online answers even when npm cannot be reached", async () => {
   const online = await amo(["doctor", "--online", "--json"])
   expect(online.code).toBe(0)
   expect(online.json().item).toMatchObject({ version: IDENTITY.version, online: expect.any(Object) })
+})
+
+it("a denied command is offered as unavailable and refused before any request (WC-PERM-23)", async () => {
+  const file = join(process.env.AMO_CONFIG_DIR ?? "", "config.json")
+  mkdirSync(join(file, ".."), { recursive: true })
+  writeFileSync(file, JSON.stringify({ profiles: { work: { permissions: { "deals.list": "deny" } } } }))
+  const account = fakeAmo()
+  const options: RunOptions & AmoEnvironment = { tty: false, keyring: signedIn(), fetch: account.fetch }
+  const mcp = await mcpOverStdio((streams) => run(["work", "mcp", "serve"], { ...options, ...streams }))
+  try {
+    const found = await mcp.call("amo_tools_search", { query: "deals list" })
+    expect(found.body).toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({ command: "deals list", availability: expect.objectContaining({ available: false }) }),
+      ]),
+    })
+    const listed = await mcp.call("amo_read", { command: "deals list" })
+    expect(listed.isError).toBe(true)
+    expect(JSON.stringify(listed.body)).toContain("permission_error")
+    expect(account.calls).toEqual([])
+  } finally {
+    expect(await mcp.close()).toBe(0)
+    rmSync(file, { force: true })
+  }
 })

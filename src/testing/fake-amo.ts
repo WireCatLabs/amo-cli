@@ -538,10 +538,21 @@ const merged = (before: Value[] | null, after: Value[]): Value[] | null => {
 const writes = (data: Data, now: () => number) => {
   let nextId = 1000
   const seconds = () => Math.floor(now() / 1000)
+  /**
+   * A pipeline named without a stage: leads-api documents only "the first stage of the main pipeline" when neither is
+   * sent, so the fake assumes the named pipeline's first regular stage (not its unsorted one).
+   */
+  const staged = (item: Json): Json => {
+    if (item.pipeline_id === undefined || item.status_id !== undefined) return item
+    const first = data.statuses
+      .filter((one) => one.pipeline_id === Number(item.pipeline_id) && one.type === 0)
+      .sort((a, b) => a.sort - b.sort)[0]
+    return { ...item, status_id: first?.id }
+  }
   const refusedStage = (item: Json, lead?: FakeLead) => {
     const pipeline = Number(item.pipeline_id ?? lead?.pipeline_id ?? data.pipelines[0]?.id)
     if (item.status_id === undefined && item.pipeline_id === undefined) return undefined
-    const stage = Number(item.status_id ?? data.statuses.find((one) => one.pipeline_id === pipeline)?.id)
+    const stage = Number(item.status_id)
     return data.statuses.some((one) => one.pipeline_id === pipeline && one.id === stage) ? undefined : "status_id"
   }
   const apply = <T extends { custom_fields_values: Value[] | null; updated_at: number }>(
@@ -596,7 +607,8 @@ const writes = (data: Data, now: () => number) => {
     hal({ _links: { self: { href: `${FAKE_ORIGIN}/api/v4/${type}` } }, _embedded: { [type]: done } })
   const create = (type: Entity) => (call: FakeCall) => {
     const done: Json[] = []
-    for (const item of call.body as Json[]) {
+    for (const given of call.body as Json[]) {
+      const item = type === "leads" ? staged(given) : given
       const record = blank[type]()
       const wrong =
         (type === "leads" ? refusedStage(item) : undefined) ?? apply(record, item, data.customFields[type] ?? [])
@@ -618,7 +630,8 @@ const writes = (data: Data, now: () => number) => {
     const all = data[type] as (FakeLead | FakeContact | FakeCompany)[]
     const found = items.map((item) => all.find((record) => record.id === Number(item.id)))
     if (found.some((record) => record === undefined)) return notFound()
-    for (const [at, item] of items.entries()) {
+    for (const [at, given] of items.entries()) {
+      const item = type === "leads" ? staged(given) : given
       const record = found[at] as FakeLead
       const wrong =
         (type === "leads" ? refusedStage(item, record) : undefined) ??

@@ -50,11 +50,18 @@ Languages: ru, en.
   record ([long-lived-token](https://developers.kommo.com/docs/long-lived-token)).
 - Users can be read only by an administrator ([users-api](https://www.amocrm.ru/developers/content/crm_platform/users-api)):
   for anyone else, `session status --check` answers the user's name and `admin` as `null`, unknown, not false.
-- OAuth comes in a later slice on cli-core's account-bound token codec: the owner's own private integration, the
-  account host and the user id kept in the same entry, a rotated refresh token honoured, and a moved run writing only
-  its temporary entry. A 401 on an OAuth access token is cli-core's `oauth.expired`, the reason `providerCall` refreshes
-  on; a 401 on a long-lived token is `session.expired`, since nothing can renew it. `src/amo/call.ts` is a copy of
-  cli-core's `providerCall` from its unreleased phase-1 branch, with the same options, until a release carries it.
+- `session start --host <address> --client-id <id>` signs in through the owner's own private integration
+  ([oauth/step-by-step](https://www.amocrm.ru/developers/content/oauth/step-by-step)). The secret key comes from
+  `AMO_AMOCRM_CLIENT_SECRET`, a hidden prompt or stdin. The browser goes to `www.amocrm.ru/oauth` for an `.amocrm.ru`
+  account and to `www.kommo.com/oauth` otherwise, with `mode=post_message`. The code is exchanged by a JSON POST to
+  `<account>/oauth2/access_token`, with no PKCE verifier, which amoCRM does not take; cli-core's form POST does not fit,
+  so `src/amo/oauth.ts` keeps its own `exchange`. cli-core's `tokenKeeper` and `accountTokenCodec` keep the entry
+  (`amo-cli` / `oauth:amocrm:<profile>`) with the account host, the user id and the Redirect URI, which every refresh
+  sends again. The refresh token rotates, so a run with moved folders refuses to refresh (`oauth.moved-rotating`).
+- The Redirect URI is b24's relay page, `https://wirecat.dev/webhooks/apps/b24-callback`, which forwards any `code`
+  and `state` to the waiting local port. Its text names Bitrix24; amo needs a page of its own (Open).
+- A 401 on an OAuth access token is cli-core's `oauth.expired`, on which `providerCall` refreshes once; a 401 on a
+  long-lived token is `session.expired`, since nothing can renew it. Each start forgets the other kind of sign-in.
 - `session status` answers `account` as the host, a string, in every answer, and `account_info` (id, name, subdomain)
   with `--check`. `account` is cli-core's word for where a sign-in belongs (`AccountKey`); b24's `portal` should become
   `account` too. `user` has b24's `id`, `name`, `admin` and `manager`; amoCRM has no department head, so an
@@ -118,28 +125,57 @@ Languages: ru, en.
 - Every write goes through cli-core's guard: the read-only lock, the levels, one question per key at `ask`, the send
   journal and an `operation_id`.
 
-### The store and sync (next slices)
+### The store and sync
 
-- Scope `mine`: a sync copies the deals whose responsible user is the signed-in user, plus colleagues the owner
-  chooses, never the whole CRM (owner, 2026-11-15, NEED-2663), as b24.
-- Pipelines and statuses first; leads with `with=contacts,loss_reason`; contacts' phones and e-mails split from their
-  `multitext` fields; companies, users, custom fields. Changes by `filter[updated_at][from]` when the account's
-  `is_api_filter_enabled` is on, else `order[updated_at]=desc` until the watermark; deletions from `*_deleted` events;
-  stage history from `lead_status_changed` events.
+- Scope `mine`: a sync copies the leads whose responsible user is the signed-in user, plus colleagues the owner
+  chooses, and only the contacts and companies on those leads, never the whole CRM (owner, 2026-11-15, NEED-2663).
+  `all` is refused (`amo.scope-all-refused`). Only an administrator may choose colleagues: anyone else cannot read the
+  users to tell who is who ([users-api](https://www.amocrm.ru/developers/content/crm_platform/users-api)).
+- `src/crm/source.ts` is cli-core's `CrmSource` over API v4. The account is read with `with=is_api_filter_enabled`,
+  which gives the user, the currency and whether the paid API filter add-on is on.
+  - With the add-on, a full round narrows leads by `filter[responsible_user_id][]`, a later round by
+    `filter[updated_at][from]`, both `order[id]=asc`, and clients are read by `filter[id][]` in chunks of 50.
+  - Without it, a full round reads every lead and keeps the chosen users' own, a later round reads
+    `order[updated_at]=desc` until a row older than the cursor, and a client is read one `GET` per id. This costs one
+    request per client and reads colleagues' leads to drop them; the add-on is the cheaper path.
+  - A round overlaps the cursor by 10 minutes. Pages are numbered, so a row deleted while a round runs may shift
+    another past a page; the next round's overlap takes it.
+- Deletions come from `<entity>_deleted` and `<entity>_restored` events since the cursor; the last event of a record
+  decides. Stage history comes from `lead_status_changed` events (`value_after[0].lead_status`), read whole each time
+  after the last one kept, since the event order is not documented.
+- Won is status 142 and lost 143 in every pipeline
+  ([leads_pipelines](https://www.amocrm.ru/developers/content/crm_platform/leads_pipelines)); a lead's
+  `_embedded.loss_reason` is its loss reason. Amounts are in the account's one currency.
 - Shared `people`, `organizations` and `users` read the account live and refuse `--offline` (NEED-2661), as b24.
+  `list` searches by name with `query=` and narrows by owner or time only with the add-on (`amo.filters-off`).
 - **Another client's contact data keeps b24's rule** (owner, NEED-2660 A): a non-administrator sees at most 100 foreign
   contacts' or companies' `show`s a UTC day, contact data is stripped from their lists, and an administrator is exempt.
-  The quota moves into cli-core; `amo` applies it through the source's `isAdmin?()` and `ownClients?()` hooks when the
-  source lands (phase 4).
-- The same rule holds for `api call` now: for anyone but the administrator it refuses a raw read of contacts and
+  cli-core applies it through the source's `isAdmin()` and `ownClients()`: a client is the user's own when it is
+  assigned to them or sits on one of their leads.
+- The same rule holds for `api call`: for anyone but the administrator it refuses a raw read of contacts and
   companies (their lists, records, notes and links, not their field definitions), of unsorted, of any record's notes
   (a call note's `params.phone` is the client's number, [add-notes](https://developers.kommo.com/reference/add-notes)),
   of events (a field-change event carries the new value,
   [events-filtration](https://developers.kommo.com/reference/events-filtration)), and any read whose `with` embeds or
-  names contacts or companies (`crm.client-reads-admin-only`, cli-core's reason, as b24's `readsClients`). A lead's own
-  fields hold its contacts' ids only, so a plain lead read stays open. `--dry-run` lists this rule and the employee
-  rules a call falls under in `admin_only`, without asking the account who signs in.
+  names contacts or companies (`crm.client-reads-admin-only`, through cli-core's `refuseForeignClientReads`). A lead's
+  own fields hold its contacts' ids only, so a plain lead read stays open. `--dry-run` lists this rule and the
+  employee rules a call falls under in `admin_only`, without asking the account who signs in.
 - Unsorted (`/api/v4/leads/unsorted`) is not synced; a deal in a `type` 1 status is open in the stage "Unsorted".
+
+### Writes
+
+`src/crm/writer.ts` is cli-core's `CrmWriter`: one mass `PATCH` or `POST` of one record, sent once, then the record
+read back. A failed read-back answers `sent: true`, so the owner syncs instead of writing again.
+
+- Deals take a title, pipeline, stage, amount, owner and `--field`; a company only on create, since `PATCH` cannot
+  set `_embedded.companies` ([leads-api](https://www.amocrm.ru/developers/content/crm_platform/leads-api)). A currency
+  other than the account's, a close date and contacts are refused before any request.
+- `close` sets 142 or 143 with the deal's pipeline; `--reason` names a loss reason by name or id.
+- Contacts take a name, first and last name, owner, e-mails and phones (into the `EMAIL` and `PHONE` fields with
+  `enum_code: "WORK"`) and `--field`. `--position` is refused: amoCRM keeps a job title in an account's own field
+  with no documented code ([contacts-api](https://www.amocrm.ru/developers/content/crm_platform/contacts-api)).
+- Companies take a name, owner and `--field`.
+- No write is idempotent: `request_id` is echoed back, not stored.
 
 ### The fake account
 
@@ -163,8 +199,14 @@ mass links route, the `with` values of the account, leads, contacts, companies, 
 `{entity_type}` takes, the limits, and `custom_fields_values`, which every write page types as a string. A contract
 test checks that every route in `src/amo/routes.ts`, the only names `amo`'s code may call, is in the table.
 
-The seeded account is synthetic: two pipelines with an unsorted, a regular, the won (142) and the lost (143) status
-each, four leads, three contacts with `PHONE` and `EMAIL` multitext fields, two companies, two users.
+The seeded account is synthetic: two pipelines with an unsorted, two regular, the won (142) and the lost (143) status
+each, four leads, three contacts with `PHONE` and `EMAIL` multitext fields, two companies, two users, two loss reasons
+and status-change events. It also answers `/oauth2/access_token` (a code once, a rotating refresh token), writes to
+all three entities, and `apiFilter: false`, which refuses `filter[…]` on leads, contacts and companies.
+
+Two of its answers are assumptions, not documented behaviour: the refusal without the add-on, and a lead sent with a
+pipeline but no stage landing in that pipeline's first regular stage (leads-api documents only "the first stage of
+the main pipeline").
 
 ### What differs from b24
 
@@ -177,13 +219,21 @@ each, four leads, three contacts with `PHONE` and `EMAIL` multitext fields, two 
 | `api list` terms `scope:`, `effect:` | `family:`, `effect:` | amoCRM has no per-method scope |
 | `api call --body` | `--params` and `--body` | as gcal-cli and drive-cli: amoCRM reads a GET's parameters from the query |
 | employee rules: delete, clear, unbind, merge, `batch` | delete, clear, unlink | amoCRM has no merge or batch call |
-| `leads`, `products` commands | none | amo has no lead entity; products later (low value) |
-| `account` commands, `sync`, CRM commands | not yet | the next slices |
+| `leads`, `products` commands | none | amo has no lead entity apart from deals; products later (low value) |
+| `deals delete` | none | API v4 has no call that deletes a lead |
+| `--position` on people | refused | amoCRM keeps a job title in an account's own field with no documented code |
+| any user may choose colleagues to sync | only an administrator | only an administrator can read the users |
+| writes take an operation id once | not idempotent | amoCRM stores no `request_id` |
+| a relay page of its own on wirecat.dev | b24's page | amo has none yet (Open) |
 
 ## Open
 
-- The `deny-keys` contract (`pnpm contracts:check`) fails until phase 4 mounts cli-core's CRM commands: it needs a
-  remote read with a permission key, and `deals list` is the first. The template's MCP deny test comes back with it.
+- amo's own relay page on wirecat.dev (cli-docs `public/webhooks/apps/`), with amoCRM in its text and the privacy
+  page; until then `RELAY_URL` is b24's.
+- cli-base `PARITY_GROUPS` should name amo with b24 among the CRM CLIs; not opened, since this repository is local.
+- How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
+- The event types `contact_deleted`, `company_deleted` and their `_restored` follow the `lead_deleted` pattern; no
+  live answer has been seen.
 
 ## Open questions for the owner
 

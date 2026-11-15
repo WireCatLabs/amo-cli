@@ -182,7 +182,7 @@ const startCommand = () =>
       ],
     }),
   )
-    .summary("sign in to an amoCRM or Kommo account with a long-lived token, or through your own integration")
+    .summary("sign in to amoCRM or Kommo with a long-lived token or your own integration")
     .description(
       "sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and " +
         "scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, " +

@@ -29,13 +29,19 @@ More: [installation](docs/installation.md), [usage](docs/usage.md).
 ## What you can do
 
 ```sh
+amo work sync                                                  # copy your own deals and their clients
+amo work deals list status:open                                # from the copy, offline
+amo work deals close deal:12 lost --reason "Дорого"
+amo work people list "Anna"                                    # any contact, read live
 amo work api list family:leads effect:write                    # the operations on leads, with their permissions
 amo work api show "PATCH /api/v4/leads/{id}"                   # what a write checks and its reference page
 amo work api call "GET /api/v4/leads/42" --params '{"with":"loss_reason"}'
 amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run   # every permission, sent nowhere
 ```
 
-Every write answers an `operation_id` and can be previewed with `--dry-run`. More: [usage](docs/usage.md) and the
+`sync` copies the deals assigned to you, plus colleagues an administrator chooses, and only the contacts and
+companies on them; any other client is read live with `people` or `organizations`. Every write answers an
+`operation_id` and can be previewed with `--dry-run`. More: [usage](docs/usage.md) and the
 [command reference](docs/commands.md).
 
 ## For AI agents
@@ -68,6 +74,10 @@ it in a private file instead. `session status --check` shows the account and the
 token on this computer, and `session list` lists the profiles. A second profile on the same account and user is
 refused. For one run, `AMO_TOKEN` with `AMO_HOST` take the place of the saved sign-in.
 
+`session start --host <address> --client-id <id>` signs in through your own private integration instead: the secret
+key comes from `AMO_AMOCRM_CLIENT_SECRET` or a hidden prompt, the browser asks you to allow it, and `amo` renews the
+access token itself. Set the integration's Redirect URI to `https://wirecat.dev/webhooks/apps/b24-callback`.
+
 amoCRM has no call that revokes a token: revoke it on the integration's Keys and scopes tab.
 
 ## Settings and permissions
@@ -98,6 +108,10 @@ More: [settings](docs/configuration.md), [security](docs/security.md).
 - A 402 means the subscription has ended: writes stop at once, reads 30 days later.
 - A 403 without a JSON body means amoCRM blocks every request from here; stop and check the account.
 - amoCRM has no idempotency key: after an `outcome_unknown`, look at the record before you write it again.
+- API v4 cannot delete a deal, so there is no `deals delete`; a contact's job title is an account field, set with
+  `--field`, not `--position`.
+- Without amoCRM's paid API filter add-on, `sync` reads a contact or company one request at a time, and `people list`
+  and `organizations list` search by name only.
 - `api call` takes only the operations of the amoCRM API v4 reference (`api list`); the Chats API, Drive and the AI
   agent API live on other hosts and are not reached.
 - Tested against a fake account built from the Kommo API reference, not yet against a live account.
