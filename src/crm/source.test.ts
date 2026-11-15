@@ -116,6 +116,19 @@ describe("crmWriteContract", () => {
     expect(await writer.close("deal", "301", "won", { operationId: "c" })).toMatchObject({ stage: "142" })
   })
 
+  it("makes a company, and renames it keeping its note", async () => {
+    const { transport, source } = over()
+    const writer = amoCrmWriter(() => transport, source)
+    const made = await writer.create(
+      "organization",
+      { name: "Example LLC", custom: { "9201": "x" } },
+      { operationId: "a" },
+    )
+    expect(made).toMatchObject({ name: "Example LLC", metadata: { "9201": { value: "x" } } })
+    const renamed = await writer.update("organization", made.externalId, { name: "Example Ltd" }, { operationId: "b" })
+    expect(renamed).toMatchObject({ name: "Example Ltd", metadata: { "9201": { value: "x" } } })
+  })
+
   it("makes a contact with its e-mail, and renames it keeping the rest", async () => {
     const { transport, source } = over()
     const writer = amoCrmWriter(() => transport, source)
@@ -147,6 +160,15 @@ describe("amoCrmSource", () => {
       expect((await all(source, "organization", null)).ids).toEqual(["501"])
     },
   )
+
+  it.each([true, false])("names a changed client once when its lead changed too, filters %s", async (apiFilter) => {
+    const { account, source } = over({ apiFilter }, 1)
+    const at = Math.floor(Date.now() / 1000) + 60
+    for (const one of [account.data.leads.find((lead) => lead.id === 301), account.data.companies[0]])
+      if (one) one.updated_at = at
+    const { ids } = await all(source, "organization", new Date((at - 120) * 1000).toISOString())
+    expect(ids).toEqual(["501"])
+  })
 
   it("reads changes without the add-on newest first, and stops at the cursor", async () => {
     const { account, source } = over({ apiFilter: false }, 1)
