@@ -54,6 +54,7 @@ describe("the fake account refuses what amoCRM refuses", () => {
     }
     for (const [method, path, body, field] of [
       ["PATCH", "/api/v4/leads", [{ name: "no id" }], "0.id"],
+      ["PATCH", "/api/v4/contacts", [{ name: "no id" }], "0.id"],
       ["POST", "/api/v4/leads", [{ nonsense_field: 1 }], "0.nonsense_field"],
       ["PATCH", "/api/v4/leads/301", { price: "abc" }, "price"],
       ["POST", "/api/v4/leads", [{ name: "x", custom_fields_values: "PHONE" }], "0.custom_fields_values"],

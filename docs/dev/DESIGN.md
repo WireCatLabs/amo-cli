@@ -66,8 +66,9 @@ Languages: ru, en.
   `*.amocrm.ru`, `*.amocrm.com` and `*.kommo.com`, and `userHosts` says the person chooses one of them.
 - amoCRM allows 7 requests a second per integration and 50 per account
   ([recommendations](https://www.amocrm.ru/developers/content/api/recommendations)). cli-core's `Pacer` keeps every
-  `amo` process on one account, whatever the profile, to 5 a second with no burst. A pace wait longer than 20 s, under
-  the one-shot run's 30 s deadline, ends at once as `rate_limited` with `retry_after_ms`; a wait from 5 s says so.
+  `amo` process on one account, whatever the profile, to 5 a second with no burst. A pace wait longer than 20 s, or
+  than the run's deadline leaves less a second, ends at once as `rate_limited` with `retry_after_ms`; a wait from 5 s
+  says so.
 - A read is tried again on a lost answer or a 5xx; any call on a 429, waiting `Retry-After`, then the body's
   `retry_after`, then a second; past 30 seconds the error carries `retry_after_ms` instead. A write that got no answer,
   or a 5xx, is `outcome_unknown` and never sent again: amoCRM documents no idempotency key.
@@ -79,8 +80,9 @@ Languages: ru, en.
   [error-codes](https://www.amocrm.ru/developers/content/crm_platform/error-codes) page lists code 113 (access from
   this IP address is forbidden) and 403 (the account is blocked for repeatedly exceeding the requests a second), and
   Kommo's [http-codes](https://developers.kommo.com/docs/http-codes) page shows the block as a bare `403 Forbidden`.
-  Neither names the body field, so `amo` reads `error_code` at the top or under `response`, and also takes any 403
-  without JSON, and any 403 on `GET /api/v4/account`, which no user right gates, as a block. A block holds the
+  Neither names the body field. `amo` reads `error_code` at the top (where Kommo's Chats API 403 example puts it) or
+  under `response` (an inference, no page shows it), and also takes any 403 without JSON, and any 403 on
+  `GET /api/v4/account`, which no user right gates (an inference), as a block. A block holds the
   account's pace for a minute, so other `amo` processes stop too.
 
 ### Permissions
@@ -109,8 +111,10 @@ Languages: ru, en.
 - Only the account's administrator, whatever the permissions (NEED-2669 A, b24's rule of 2026-11-10): a delete, an
   update that sets any field to nothing (`null`, `""`, `[]`, a field's `values: []`), and an unlink. amoCRM has no
   merge call. The check is in the transport, where every write passes, and asks `GET /api/v4/users/{id}`'s
-  `rights.is_admin` only when a write falls under it; a refusal of that read means not an administrator
-  ([users-api](https://www.amocrm.ru/developers/content/crm_platform/users-api)). A create may leave fields empty.
+  `rights.is_admin` only when a write falls under it (the field is in that operation's answer in the spec,
+  [get-user-by-id](https://developers.kommo.com/reference/get-user-by-id)); a refusal of that read means not an
+  administrator ([users-api](https://www.amocrm.ru/developers/content/crm_platform/users-api)). A create may leave
+  fields empty.
 - Every write goes through cli-core's guard: the read-only lock, the levels, one question per key at `ask`, the send
   journal and an `operation_id`.
 
@@ -142,8 +146,8 @@ schemas, which only the tests load. The fake refuses, with amoCRM's 400 `validat
 
 - a query parameter the operation does not declare, a value of the wrong type (`filter[updated_at][from]=yesterday`),
   a `with` value no page names, a `limit` past 250 (events 100);
-- a body field the schema does not declare, a wrong type, a missing required field (an update without `id`), and a
-  body where the operation takes none.
+- a body field the schema does not declare, a wrong type, a missing required field, a mass update item without `id`
+  (the contacts, companies and tasks pages leave it out of their schemas), and a body where the operation takes none.
 
 It refuses an unknown path or method (404), a wrong token (401), a request past 7 a second on a clock the test drives
 (429 with `retry_after`), and answers an empty page with 204. Any operation it has no answer for is a 501, reads too:
@@ -180,5 +184,7 @@ each, four leads, three contacts with `PHONE` and `EMAIL` multitext fields, two 
 
 - Does the account answer `filter[updated_at]` without the paid filtering add-on? The ru docs call it "Alpha"; the
   sync falls back to ordering by `updated_at` (RISK-2306). Answered by the first live check.
+- What does a non-administrator's 403 on `GET /api/v4/users/{id}` look like? If its body carries `error_code` 403,
+  `amo` reads it as a block and a non-administrator could not sign in. The first live check records it.
 - The Kommo reference is Kommo's and the account may be amoCRM's: a ru-only difference would pass the fake and fail
   live (RISK-2308). The first live check is the owner's.

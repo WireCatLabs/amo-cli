@@ -13,8 +13,12 @@ import { ROUTES, type Route } from "./routes.js"
 /** A third of a one-shot command's 30 s deadline, so a read that timed out can be tried again before the run ends. */
 const DEFAULT_TIMEOUT_MS = 10_000
 const LARGEST_ANSWER = 16 * 1024 * 1024
-/** Below the one-shot run's 30 s deadline: a longer pace ends as `rate_limited` with its wait, not as the deadline. */
+/**
+ * Below the one-shot run's 30 s deadline, and below what is left of the run's own deadline less a second for the
+ * request: a longer pace ends as `rate_limited` with its wait, not as the deadline.
+ */
 const LONGEST_PACE_WAIT_MS = 20_000
+const REQUEST_MARGIN_MS = 1_000
 /** A block stops every request from here: every amo process on the account holds off this long (Kommo http-codes). */
 const BLOCK_HOLD_MS = 60_000
 
@@ -45,6 +49,8 @@ export interface AmoTransportOptions {
   sleep?: SleepLike
   now?: () => number
   warn?: TurnOptions["warn"]
+  /** The run's deadline now, as cli-core's `run()` sets it; none for a persistent command. */
+  deadline?: () => { endsAt: number } | undefined
 }
 
 const isTimeout = (error: unknown) => error instanceof Error && error.name === "TimeoutError"
@@ -80,6 +86,7 @@ export class AmoTransport {
   readonly #sleep: SleepLike
   readonly #now: () => number
   readonly #warn: TurnOptions["warn"]
+  readonly #deadline: AmoTransportOptions["deadline"]
   #admin: Promise<boolean> | undefined
 
   constructor(options: AmoTransportOptions) {
@@ -97,6 +104,14 @@ export class AmoTransport {
     this.#sleep = options.sleep ?? realSleep
     this.#now = options.now ?? Date.now
     this.#warn = options.warn
+    this.#deadline = options.deadline
+  }
+
+  #longestWaitMs(): number {
+    const ends = this.#deadline?.()?.endsAt
+    return ends === undefined
+      ? LONGEST_PACE_WAIT_MS
+      : Math.max(0, Math.min(LONGEST_PACE_WAIT_MS, ends - this.#now() - REQUEST_MARGIN_MS))
   }
 
   /** The account's address, which holds no secret. */
@@ -125,7 +140,7 @@ export class AmoTransport {
               operation: operation.name,
               now: this.#now,
               sleep: (ms: number) => this.#wait(ms),
-              longestWaitMs: LONGEST_PACE_WAIT_MS,
+              longestWaitMs: this.#longestWaitMs(),
               ...(this.#warn ? { warn: this.#warn } : {}),
             },
           }
