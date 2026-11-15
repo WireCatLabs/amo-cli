@@ -15,6 +15,8 @@ import { hostFetch } from "@wirecat/cli-base/http"
 const root = resolve(import.meta.dirname, "..")
 const SPEC = "contracts/kommo-openapi.json"
 const OUT = "src/amo/operations.ts"
+/** Test code only: the fake checks every query value and body against them, so the CLI's bundle never carries them. */
+const SCHEMAS_OUT = "src/testing/kommo-schemas.ts"
 const DOCS = "https://developers.kommo.com"
 const VERBS = ["get", "post", "patch", "put", "delete"] as const
 const PAGE_GAP_MS = 1_000
@@ -73,6 +75,25 @@ const refetch = async () => {
 /** The account's CRM API only: the Chats API, Drive and the AI agent API live on other hosts this CLI never reaches. */
 const onAccountHost = (path: string) => path.startsWith("/api/v4/")
 
+/** What a check needs: types, enums, required names. Descriptions and examples are the pages' prose. */
+const PROSE = new Set(["description", "deprecated", "default", "sensitive"])
+const bare = (node: unknown): unknown => {
+  if (Array.isArray(node)) return node.map(bare)
+  if (!isRecord(node)) return node
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([key]) => !PROSE.has(key))
+      .map(([key, value]) => [key, bare(value)]),
+  )
+}
+
+/** The merged pages wrap an array body in a `RAW_BODY` property that is not sent: the array is the body. */
+const unwrapped = (node: unknown): unknown => {
+  if (!isRecord(node) || node.type !== "object" || !isRecord(node.properties)) return node
+  const names = Object.keys(node.properties)
+  return names.length === 1 && names[0] === "RAW_BODY" ? node.properties.RAW_BODY : node
+}
+
 const operations = () => {
   const document = JSON.parse(readFileSync(join(root, SPEC), "utf8")) as Json
   const all = document.paths as Record<string, Json>
@@ -85,6 +106,7 @@ const operations = () => {
     }
   document.paths = Object.fromEntries(Object.entries(all).filter(([path]) => onAccountHost(path)))
   const model = adaptOpenApi(document, { sourceUrl: `${DOCS}/llms.txt` })
+  const schemas: Record<string, { query: Record<string, unknown>; body?: unknown }> = {}
   const rows = model.operations
     .flatMap((op) => (op.binding.kind === "http" ? [{ op, binding: op.binding }] : []))
     .map(({ op, binding }) => {
@@ -101,6 +123,12 @@ const operations = () => {
             return [one.name, { type: "string" }]
           }),
       )
+      schemas[name] = {
+        query: Object.fromEntries(
+          op.parameters.filter((one) => one.in === "query").map((one) => [one.name, bare(one.schema)]),
+        ),
+        ...(op.requestBody ? { body: bare(unwrapped(op.requestBody.schema)) } : {}),
+      }
       return {
         name,
         effect: op.effect,
@@ -118,11 +146,30 @@ const operations = () => {
     `export const SPEC_OPERATIONS: readonly SpecOperation[] = ${JSON.stringify(rows)}`,
     "",
   ].join("\n")
-  const [artifact] = generate(model, [() => [{ path: OUT, content }]], {
-    banner: [`Source: ${SPEC}`, "Run: pnpm kommo:operations"],
-  })
+  const sorted = Object.fromEntries(Object.entries(schemas).sort(([a], [b]) => a.localeCompare(b)))
+  const schemaContent = [
+    `import type { SchemaNode } from "@wirecat/cli-base/codegen"`,
+    "",
+    "export interface KommoSchema {",
+    "  query: Readonly<Record<string, SchemaNode>>",
+    "  body?: SchemaNode",
+    "}",
+    "",
+    `export const KOMMO_SCHEMAS: Readonly<Record<string, KommoSchema>> = ${JSON.stringify(sorted)} as Readonly<Record<string, KommoSchema>>`,
+    "",
+  ].join("\n")
+  const artifacts = generate(
+    model,
+    [
+      () => [
+        { path: OUT, content },
+        { path: SCHEMAS_OUT, content: schemaContent },
+      ],
+    ],
+    { banner: [`Source: ${SPEC}`, "Run: pnpm kommo:operations"] },
+  )
   const check = process.argv.includes("--check")
-  const stale = writeArtifacts(artifact ? [artifact] : [], {
+  const stale = writeArtifacts(artifacts, {
     root,
     check,
     format: (path, text) =>
@@ -133,7 +180,7 @@ const operations = () => {
       ),
   })
   if (check && stale.length) {
-    process.stderr.write(`${OUT} is stale; run pnpm kommo:operations\n`)
+    process.stderr.write(`${stale.join(", ")} stale; run pnpm kommo:operations\n`)
     process.exitCode = 1
     return
   }

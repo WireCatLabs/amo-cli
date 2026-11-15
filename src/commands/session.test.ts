@@ -49,13 +49,9 @@ describe("session start", () => {
       state: "saved",
       kind: "token",
       verified: true,
-      account: {
-        host: "wirecatfake.amocrm.ru",
-        id: "31000001",
-        name: "WireCat Fake Account",
-        subdomain: "wirecatfake",
-      },
-      user: { id: "7001", name: "Test Owner", admin: true },
+      account: "wirecatfake.amocrm.ru",
+      account_info: { id: "31000001", name: "WireCat Fake Account", subdomain: "wirecatfake" },
+      user: { id: "7001", name: "Test Owner", admin: true, manager: true },
     })
     expect(ran.out).not.toContain(FAKE_TOKEN)
     expect(account.calls.map((one) => one.operation)).toEqual(["GET /api/v4/account", "GET /api/v4/users/{id}"])
@@ -69,7 +65,7 @@ describe("session start", () => {
       account: fakeAmo({ admin: false }),
       stdin: FAKE_TOKEN,
     })
-    expect(ran.json().item).toMatchObject({ user: { id: "7001", name: null, admin: null } })
+    expect(ran.json().item).toMatchObject({ user: { id: "7001", name: null, admin: null, manager: null } })
   })
 
   it("keeps nothing when the account refuses the token, and never shows it", async () => {
@@ -134,11 +130,15 @@ describe("session status, end and list", () => {
       state: "saved",
       kind: "token",
       token_from: "keyring",
-      account: { host: "wirecatfake.amocrm.ru" },
+      account: "wirecatfake.amocrm.ru",
       verified: false,
     })
     const checked = await amo(["work", "session", "status", "--check", "--json"])
-    expect(checked.json().item).toMatchObject({ verified: true, user: { id: "7001", admin: true } })
+    expect(checked.json().item).toMatchObject({
+      verified: true,
+      account: "wirecatfake.amocrm.ru",
+      user: { id: "7001", admin: true },
+    })
     expect(checked.out).not.toContain(FAKE_TOKEN)
   })
 

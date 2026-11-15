@@ -13,7 +13,7 @@ npm install -g @wirecat/amo-cli
 amo skill install                                          # the agent skill, for Claude Code, Codex, Gemini CLI and OpenClaw
 amo work session start --host https://example.amocrm.ru   # paste the long-lived token; it is kept in the keyring
 amo work session status --check                            # the account and the user the token acts as
-amo work api call "GET /api/v4/leads" --query '{"limit":5}'
+amo work api call "GET /api/v4/leads" --params '{"limit":5}'
 ```
 
 `https://example.amocrm.ru` is your account's address: `<subdomain>.amocrm.ru`, `<subdomain>.kommo.com` or
@@ -31,7 +31,7 @@ More: [installation](docs/installation.md), [usage](docs/usage.md).
 ```sh
 amo work api list family:leads effect:write                    # the operations on leads, with their permissions
 amo work api show "PATCH /api/v4/leads/{id}"                   # what a write checks and its reference page
-amo work api call "GET /api/v4/leads/42" --query '{"with":"contacts"}'
+amo work api call "GET /api/v4/leads/42" --params '{"with":"loss_reason"}'
 amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run   # every permission, sent nowhere
 ```
 
@@ -54,9 +54,9 @@ comes as JSON with a code to branch on.
 
 - **Your CRM where your agent works.** An agent reads a lead, its contacts and the pipeline, in the terminal or over
   MCP, with the same commands and answers as `b24` for Bitrix24.
-- **Your rules, not the agent's.** Every API operation has a permission level per profile. Writes and deletes ask
-  first, and the operations that message people, run Salesbots, send data to webhooks or change rights are denied
-  until you allow them.
+- **Your rules, not the agent's.** Every API operation has a permission level per profile. Notes, events and deletes
+  ask first, and the operations that message people, run Salesbots, send data to webhooks, add users, set tasks or
+  change rights are denied until you allow them.
 - **Nothing private on screen or in logs.** The token stays in the keyring and never appears in output, errors or run
   records.
 
@@ -74,10 +74,17 @@ amoCRM has no call that revokes a token: revoke it on the integration's Keys and
 
 Each profile has a permission level for every operation: `allow`, `ask`, `readonly` or `deny`. Its key is the path's
 words and the verb: `GET /api/v4/leads/{id}` is `api.leads.id.get`, so `api.leads=readonly` covers every lead
-operation. Reads are allowed, writes and deletes ask. Conversations, chats, Salesbots, webhooks, widgets, website
-buttons, calls and switching users on or off are denied, reads too; so are writes to roles and lead sources. `api
-call` also checks the key of the command that does the same thing, such as `deals.update` for `PATCH /api/v4/leads`,
-and `crm.assign-others`, denied, when a write hands a record to another user.
+operation. What `amo`'s own commands read is allowed (leads, contacts, companies, pipelines, fields, users, the
+account, tasks and the events list), and so are creating and changing leads, contacts and companies. Every other read,
+such as notes, unsorted or an event's detail, asks, and so do other writes and every delete. Conversations, chats,
+Salesbots, webhooks, widgets, website buttons, calls and switching users on or off are denied, reads too; so are adding
+users and writing tasks, roles and lead sources. `api call` also checks the key of the command that does the same
+thing, such as `deals.update` for `PATCH /api/v4/leads`, and `crm.assign-others`, denied, when a write hands a record,
+a task or a nested contact to another user.
+
+Some things only the account's administrator does through `amo`, whatever the permissions say: deleting, setting a
+field to nothing, unlinking records, and reading contacts and companies through `api call` (your own clients come with
+sync; another one with `people show`, 100 a day).
 
 **Over MCP `ask` does not ask: the write goes ahead**, since no one is there to answer. `AMO_READ_ONLY=1` refuses
 every write.

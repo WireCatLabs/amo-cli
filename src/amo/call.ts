@@ -1,65 +1,74 @@
-import { backoffMs, CliError, isCliError, type RetryConfig } from "@wirecat/cli-base"
+import { backoffMs, CliError, isCliError, type RetryConfig, realSleep } from "@wirecat/cli-base"
+import { type Pacer, type TurnOptions, waitForTurn } from "@wirecat/cli-core/sends"
 
 /*
- * A local copy of the shape cli-core's `providerCall` (@wirecat/cli-core/crm) is frozen at in the amo-cli plan, so
- * the transport codes against it now; phase 4 deletes this file and imports cli-core's.
+ * cli-core's `providerCall` as its phase-1 branch has it (cli-core feat/crm-shared-records, src/crm/provider-call.ts,
+ * not released yet): the same options, retries and refresh reason, so phase 4 swaps the import and nothing else.
  */
-
-export interface CallPacer {
-  holdFor(ms: number): void
-  wait(): Promise<void>
-}
-
-export interface ProviderCallOptions<T> {
-  write: boolean
-  /** One HTTP exchange; throws a CliError with a reason. */
-  send: () => Promise<T>
-  pacer?: CallPacer
-  /** One token refresh on `session.expired`; false gives up. */
-  refresh?: () => Promise<boolean>
-  /** Reads: a retryable failure and `rate_limited`; writes: `rate_limited` only. */
-  retries?: number
-}
 
 const RETRY: RetryConfig = { retries: 3, baseDelayMs: 1_000, maxDelayMs: 10_000, maxRetryAfterMs: 30_000 }
+/**
+ * A write cut off by these, or answered with a body nobody can read, may have reached the CRM: only a refusal says it
+ * did not. A cancel while waiting for the turn is thrown before the try and stays `cancelled`.
+ */
+const UNANSWERED = new Set(["timeout", "network_error", "provider_unavailable", "cancelled", "invalid_response"])
 
-const lost = (error: CliError) => error.code === "network_error" || error.code === "timeout"
+export interface ProviderCallOptions<T> {
+  /** A write is tried again only on `rate_limited`, which a CRM answers before doing anything. */
+  write: boolean
+  /** One HTTP exchange; it throws a cli-base `CliError` with a reason. */
+  send: () => Promise<T>
+  /** The account's shared pace: each attempt waits its turn, and a refused rate holds it. */
+  pace?: { pacer: Pacer } & TurnOptions
+  /** One token refresh on `oauth.expired`; false gives up. A refused token did nothing, so a write goes again too. */
+  refresh?: () => Promise<boolean>
+  /** Attempts after the first; 3 when absent. */
+  retries?: number
+  /** Waits between attempts; a test or a cancellable run passes its own. */
+  sleep?: (ms: number) => Promise<void>
+  random?: () => number
+}
+
+const unanswered = (error: unknown): boolean =>
+  !isCliError(error) || (UNANSWERED.has(error.code) && error.details.sent !== false)
 
 /**
- * Paces every attempt, tries a read again on a retryable failure and any call on `rate_limited`, which the provider
- * answers before doing anything. A wait longer than 30 s is the caller's: the error carries `retry_after_ms`. A write
- * that got no answer may have landed, so it is `outcome_unknown` and never sent again (WC-LIFE-9).
+ * One call to a CRM: paced, reads tried again on a retryable failure or a refused rate, a write only on a refused
+ * rate. A write that got no answer is `outcome_unknown` and is never sent again: a CRM may have carried it out.
  */
-export const providerCall = async <T>({
-  write,
-  send,
-  pacer,
-  refresh,
-  retries = RETRY.retries,
-}: ProviderCallOptions<T>): Promise<T> => {
+export const providerCall = async <T>(options: ProviderCallOptions<T>): Promise<T> => {
+  const retries = options.retries ?? RETRY.retries
+  const sleep = options.sleep ?? ((ms: number) => realSleep(ms))
   let refreshed = false
   for (let attempt = 1; ; attempt++) {
-    await pacer?.wait()
+    if (options.pace) await waitForTurn(options.pace.pacer, options.pace)
     try {
-      return await send()
+      return await options.send()
     } catch (error) {
-      if (!isCliError(error)) throw error
-      if (write && lost(error))
-        throw new CliError("outcome_unknown", `${error.message}; the write may or may not have been carried out`, {
-          ...error.details,
-          retryable: false,
-        })
-      if (error.details.reason === "session.expired" && refresh && !refreshed) {
+      if (
+        !refreshed &&
+        options.refresh &&
+        isCliError(error) &&
+        error.code === "authentication_error" &&
+        error.details.reason === "oauth.expired"
+      ) {
         refreshed = true
-        if (await refresh()) continue
+        if (await options.refresh()) continue
         throw error
       }
-      const again = error.code === "rate_limited" || (!write && error.details.retryable === true)
+      if (options.write && unanswered(error))
+        throw new CliError(
+          "outcome_unknown",
+          `${error instanceof Error ? error.message : String(error)}; the CRM may or may not have carried it out`,
+          { ...(isCliError(error) ? error.details : {}), retryable: false },
+        )
+      if (!isCliError(error)) throw error
       const asked = error.details.retry_after_ms
-      const wait = typeof asked === "number" ? asked : backoffMs(attempt, RETRY, Math.random)
-      if (!again || attempt > retries || wait > RETRY.maxRetryAfterMs) throw error
-      // The shape has no sleep of its own: the pace holds every caller on the account, which a refusal asks for.
-      pacer?.holdFor(wait)
+      const wait = typeof asked === "number" ? asked : backoffMs(attempt, RETRY, options.random ?? Math.random)
+      const again = error.code === "rate_limited" || (!options.write && error.details.retryable === true)
+      if (!again || wait > RETRY.maxRetryAfterMs || attempt > retries) throw error
+      if (error.code === "rate_limited") await options.pace?.pacer.holdFor(wait)
+      await sleep(wait)
     }
   }
 }

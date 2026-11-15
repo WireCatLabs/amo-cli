@@ -1,23 +1,28 @@
-import { CliError, isCliError, realSleep, type SleepLike, wallClock } from "@wirecat/cli-base"
+import { CliError, isCliError, realSleep, type SleepLike } from "@wirecat/cli-base"
 import { type FetchLike, hostFetch, providerWaitMs, readJsonResponse } from "@wirecat/cli-base/http"
 import { apiJson, currentAttempt, type EventSink, providerEvent, providerRequest } from "@wirecat/cli-core/cli"
-import { type Pacer, waitForTurn } from "@wirecat/cli-core/sends"
+import type { Pacer, TurnOptions } from "@wirecat/cli-core/sends"
+import { type EmployeeRule, employeeRuleOf } from "../api-keys.js"
 import type { AmoSignIn } from "./account.js"
-import { type CallPacer, providerCall } from "./call.js"
+import { providerCall } from "./call.js"
 import { amoError } from "./errors.js"
+import { isRecord } from "./json.js"
 import { type Matched, matchOperation, pathOf } from "./operation.js"
+import { ROUTES, type Route } from "./routes.js"
 
 /** A third of a one-shot command's 30 s deadline, so a read that timed out can be tried again before the run ends. */
 const DEFAULT_TIMEOUT_MS = 10_000
 const LARGEST_ANSWER = 16 * 1024 * 1024
-/** An agent usually waits on amo: past a minute the run ends with retry_after_ms instead of sitting silent. */
-const LONGEST_PACE_WAIT_MS = 60_000
+/** Below the one-shot run's 30 s deadline: a longer pace ends as `rate_limited` with its wait, not as the deadline. */
+const LONGEST_PACE_WAIT_MS = 20_000
+/** A block stops every request from here: every amo process on the account holds off this long (Kommo http-codes). */
+const BLOCK_HOLD_MS = 60_000
 
 export type QueryValue = string | number | boolean | readonly (string | number)[]
 
 export interface AmoRequest {
-  /** `GET /api/v4/leads/{id}`, a name the spec or the allow-list has. */
-  route: string
+  /** One of amo's own routes, or the operation `api call` matched. */
+  route: Route | Matched
   ids?: Record<string, string | number>
   query?: Readonly<Record<string, QueryValue | undefined>>
   body?: unknown
@@ -39,17 +44,24 @@ export interface AmoTransportOptions {
   pacer?: Pacer
   sleep?: SleepLike
   now?: () => number
+  warn?: TurnOptions["warn"]
 }
 
 const isTimeout = (error: unknown) => error instanceof Error && error.name === "TimeoutError"
 
 const routeOf = (request: AmoRequest): Matched => {
-  const matched = matchOperation(request.route)
+  const matched = typeof request.route === "string" ? matchOperation(request.route) : request.route
   const ids = Object.fromEntries(Object.entries(request.ids ?? {}).map(([key, value]) => [key, String(value)]))
   for (const [key, value] of Object.entries(ids))
     if (!(key in matched.operation.path) || value === "" || value === "." || value === "..")
-      throw new CliError("validation_error", `${request.route} takes no id ${key}="${value}"`)
+      throw new CliError("validation_error", `${matched.operation.name} takes no id ${key}="${value}"`)
   return { operation: matched.operation, ids: { ...matched.ids, ...ids } }
+}
+
+const EMPLOYEE_REFUSALS: Record<EmployeeRule, string> = {
+  delete: "deletes",
+  clear: "sets a field to nothing",
+  unbind: "unlinks records",
 }
 
 /**
@@ -64,7 +76,11 @@ export class AmoTransport {
   readonly #timeoutMs: number
   readonly #signal: AbortSignal | undefined
   readonly #events: EventSink | undefined
-  readonly #pacer: CallPacer | undefined
+  readonly #pacer: Pacer | undefined
+  readonly #sleep: SleepLike
+  readonly #now: () => number
+  readonly #warn: TurnOptions["warn"]
+  #admin: Promise<boolean> | undefined
 
   constructor(options: AmoTransportOptions) {
     this.#signIn = options.signIn
@@ -77,33 +93,10 @@ export class AmoTransport {
     })
     this.#signal = options.signal
     this.#events = options.events
-    const sleep = options.sleep ?? realSleep
-    const now = options.now ?? Date.now
-    const pacer = options.pacer
-    if (pacer) {
-      let held: Promise<void> = Promise.resolve()
-      this.#pacer = {
-        holdFor: (ms) => {
-          held = pacer.holdFor(ms)
-        },
-        wait: async () => {
-          await held
-          await waitForTurn(pacer, {
-            name: "amoCRM",
-            operation: "request",
-            now,
-            sleep: async (ms) => {
-              try {
-                await sleep(ms, this.#signal, "retry")
-              } catch {
-                throw new CliError("cancelled", "stopped while waiting for amoCRM's pace")
-              }
-            },
-            longestWaitMs: LONGEST_PACE_WAIT_MS,
-          })
-        },
-      }
-    }
+    this.#pacer = options.pacer
+    this.#sleep = options.sleep ?? realSleep
+    this.#now = options.now ?? Date.now
+    this.#warn = options.warn
   }
 
   /** The account's address, which holds no secret. */
@@ -111,29 +104,79 @@ export class AmoTransport {
     return this.#signIn.origin
   }
 
-  get userId(): string | undefined {
-    return this.#signIn.userId
-  }
-
-  /** One operation, paced, a read tried again on a lost answer, any call on a refused rate (`providerCall`). */
+  /**
+   * One operation, paced, a read tried again on a lost answer, any call on a refused rate (`providerCall`). A write
+   * only an administrator may send is refused here, where every write passes (NEED-2669 A).
+   */
   async request(request: AmoRequest): Promise<AmoAnswer> {
     const route = routeOf(request)
-    const write = route.operation.effect !== "read"
+    const { operation } = route
+    const write = operation.effect !== "read"
+    if (write) await this.#refuseForEmployee(route, request.body)
     let attempt = 0
     return providerCall({
       write,
-      ...(this.#pacer ? { pacer: this.#pacer } : {}),
+      sleep: (ms) => this.#wait(ms),
+      ...(this.#pacer
+        ? {
+            pace: {
+              pacer: this.#pacer,
+              name: "amoCRM",
+              operation: operation.name,
+              now: this.#now,
+              sleep: (ms: number) => this.#wait(ms),
+              longestWaitMs: LONGEST_PACE_WAIT_MS,
+              ...(this.#warn ? { warn: this.#warn } : {}),
+            },
+          }
+        : {}),
       send: () => this.#once(route, request, write, ++attempt),
     })
   }
 
+  /**
+   * Whether the token's user is the account's administrator: `rights.is_admin` of `/api/v4/users/{id}`, which only an
+   * administrator may read, so a refusal is a no (users-api). Asked once per run, and only when a rule needs it.
+   */
+  isAdmin(): Promise<boolean> {
+    this.#admin ??= (async () => {
+      let id = this.#signIn.userId
+      if (id === undefined) {
+        const { body } = await this.request({ route: ROUTES.account })
+        id = isRecord(body) ? String(body.current_user_id ?? "") : ""
+      }
+      try {
+        const { body } = await this.request({ route: ROUTES.user, ids: { id } })
+        return isRecord(body) && isRecord(body.rights) && body.rights.is_admin === true
+      } catch (error) {
+        if (isCliError(error) && error.details.reason === "amo.access-denied") return false
+        throw error
+      }
+    })()
+    return this.#admin
+  }
+
+  async #refuseForEmployee(route: Matched, body: unknown) {
+    const rule = employeeRuleOf(route.operation, body)
+    if (rule === undefined || (await this.isAdmin())) return
+    throw new CliError(
+      "permission_error",
+      `${route.operation.name} ${EMPLOYEE_REFUSALS[rule]}, which amo lets only an amoCRM administrator do, whatever ` +
+        "the permissions say. Sign in with an administrator's token (session start) to do it",
+      { reason: `employee.${rule}`, operation: route.operation.name, sent: false },
+    )
+  }
+
+  async #wait(ms: number) {
+    try {
+      await this.#sleep(ms, this.#signal, "retry")
+    } catch {
+      throw new CliError("cancelled", "stopped while waiting for amoCRM")
+    }
+  }
+
   async #once(route: Matched, request: AmoRequest, write: boolean, attempt: number): Promise<AmoAnswer> {
     const { operation } = route
-    const url = new URL(pathOf(route), this.#signIn.origin)
-    for (const [key, value] of Object.entries(request.query ?? {})) {
-      if (value === undefined) continue
-      for (const one of Array.isArray(value) ? value : [value]) url.searchParams.append(key, String(one))
-    }
     // Not AbortSignal.timeout: its timer holds the run's async context until the deadline (tg-cli, 2026-11-05).
     const deadline = new AbortController()
     const timer = setTimeout(
@@ -149,71 +192,98 @@ export class AmoTransport {
     })
     const signal = AbortSignal.any([deadline.signal, ...(this.#signal ? [this.#signal] : [])])
     try {
-      let response: Response
-      try {
-        response = await this.#fetch(url, {
-          method: operation.method,
-          headers: {
-            authorization: `Bearer ${this.#signIn.token}`,
-            accept: "application/hal+json, application/problem+json, application/json",
-            ...(request.body === undefined ? {} : { "content-type": "application/json" }),
-          },
-          ...(request.body === undefined ? {} : { body: apiJson(request.body) }),
-          // A redirect would carry the Authorization header to an address we did not choose.
-          redirect: "error",
-          signal,
-        })
-      } catch (error) {
-        const failure = this.#unanswered(operation.name, write, signal.aborted ? signal.reason : error)
-        end({ errorCode: failure.code })
-        throw failure
-      }
+      const response = await this.#send(route, request, write, signal, end)
       if (response.status === 204) {
         end({ status: 204 })
         return { status: 204, body: undefined }
       }
-      let body: unknown
-      let json = true
-      try {
-        body = await readJsonResponse(response, { maxBytes: LARGEST_ANSWER, signal })
-      } catch (error) {
-        if (signal.aborted) {
-          const failure = this.#unanswered(operation.name, write, signal.reason)
-          end({ status: response.status, errorCode: failure.code })
-          throw failure
-        }
-        if (response.ok) {
-          end({ status: response.status, errorCode: "invalid_response" })
-          throw new CliError("invalid_response", `amoCRM answered ${operation.name} with something that is not JSON`, {
-            operation: operation.name,
-            status: response.status,
-            ...(isCliError(error) ? { reason: error.details.reason } : {}),
-          })
-        }
-        json = false
-      }
-      if (!response.ok) {
-        const refusal = amoError(operation.name, response.status, body, {
-          json,
-          waitMs: providerWaitMs(response.headers, wallClock),
-        })
-        end({ status: response.status, errorCode: refusal.code })
-        throw write && refusal.code === "provider_unavailable"
-          ? new CliError(
-              "outcome_unknown",
-              `amoCRM failed on ${operation.name}; it may or may not have carried it out`,
-              {
-                ...refusal.details,
-                retryable: false,
-              },
-            )
-          : refusal
-      }
+      const { body, json } = await this.#read(operation.name, response, write, signal, end)
+      if (!response.ok) throw await this.#refusal(operation.name, response, body, json, write, end)
       end({ status: response.status })
       return { status: response.status, body }
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  async #send(
+    route: Matched,
+    request: AmoRequest,
+    write: boolean,
+    signal: AbortSignal,
+    end: ReturnType<typeof providerRequest>,
+  ): Promise<Response> {
+    const { operation } = route
+    const url = new URL(pathOf(route), this.#signIn.origin)
+    for (const [key, value] of Object.entries(request.query ?? {})) {
+      if (value === undefined) continue
+      for (const one of Array.isArray(value) ? value : [value]) url.searchParams.append(key, String(one))
+    }
+    try {
+      return await this.#fetch(url, {
+        method: operation.method,
+        headers: {
+          authorization: `Bearer ${this.#signIn.token}`,
+          accept: "application/hal+json, application/problem+json, application/json",
+          ...(request.body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        ...(request.body === undefined ? {} : { body: apiJson(request.body) }),
+        // A redirect would carry the Authorization header to an address we did not choose.
+        redirect: "error",
+        signal,
+      })
+    } catch (error) {
+      const failure = this.#unanswered(operation.name, write, signal.aborted ? signal.reason : error)
+      end({ errorCode: failure.code })
+      throw failure
+    }
+  }
+
+  async #read(
+    operation: string,
+    response: Response,
+    write: boolean,
+    signal: AbortSignal,
+    end: ReturnType<typeof providerRequest>,
+  ): Promise<{ body: unknown; json: boolean }> {
+    try {
+      return { body: await readJsonResponse(response, { maxBytes: LARGEST_ANSWER, signal }), json: true }
+    } catch (error) {
+      if (signal.aborted) {
+        const failure = this.#unanswered(operation, write, signal.reason)
+        end({ status: response.status, errorCode: failure.code })
+        throw failure
+      }
+      if (!response.ok) return { body: undefined, json: false }
+      end({ status: response.status, errorCode: "invalid_response" })
+      throw new CliError("invalid_response", `amoCRM answered ${operation} with something that is not JSON`, {
+        operation,
+        status: response.status,
+        ...(isCliError(error) ? { reason: error.details.reason } : {}),
+      })
+    }
+  }
+
+  async #refusal(
+    operation: string,
+    response: Response,
+    body: unknown,
+    json: boolean,
+    write: boolean,
+    end: ReturnType<typeof providerRequest>,
+  ): Promise<CliError> {
+    const refusal = amoError(operation, response.status, body, {
+      json,
+      waitMs: providerWaitMs(response.headers, () => new Date(this.#now())),
+      ...(this.#signIn.oauth ? { oauth: true } : {}),
+    })
+    end({ status: response.status, errorCode: refusal.code })
+    if (refusal.details.reason === "amo.blocked") await this.#pacer?.holdFor(BLOCK_HOLD_MS)
+    if (!write || refusal.code !== "provider_unavailable") return refusal
+    return new CliError("outcome_unknown", `amoCRM failed on ${operation}; it may or may not have carried it out`, {
+      ...refusal.details,
+      retryable: false,
+    })
   }
 
   /** A cut write may have reached amoCRM: never `cancelled`, which a caller would repeat; `providerCall` says so. */
@@ -227,11 +297,4 @@ export class AmoTransport {
       { operation, retryable: true },
     )
   }
-}
-
-/** The records of a HAL list, `_embedded.<name>`; none on 204. */
-export const embedded = (answer: AmoAnswer, name: string): unknown[] => {
-  const holder = (answer.body as { _embedded?: Record<string, unknown> } | undefined)?._embedded
-  const list = holder?.[name]
-  return Array.isArray(list) ? list : []
 }

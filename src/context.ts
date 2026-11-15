@@ -76,9 +76,10 @@ export const signInOf = (command: Command): AmoSignIn => {
 }
 
 export const transportFor = (command: Command, signIn: AmoSignIn, events?: EventSink): AmoTransport => {
-  const { environment, env } = contextOf(command)
+  const { environment, env, renderer } = contextOf(command)
   return new AmoTransport({
     signIn,
+    warn: renderer.warn,
     ...(events ? { events } : {}),
     ...(environment.fetch ? { fetch: environment.fetch } : {}),
     ...(environment.signal ? { signal: environment.signal } : {}),

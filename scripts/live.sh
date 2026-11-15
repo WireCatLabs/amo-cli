@@ -34,7 +34,7 @@ trap '"${cli[@]}" live session end --json >/dev/null 2>&1 || true; rm -rf "$work
 node -e '
   const fs = require("fs")
   const status = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).item
-  if (status.verified !== true || !status.account.id) throw new Error("the token was not verified")
+  if (status.verified !== true || !status.account_info.id) throw new Error("the token was not verified")
   const pipelines = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).item.result._embedded.pipelines
   if (!pipelines.every((one) => one._embedded.statuses.some((stage) => stage.id === 142)))
     throw new Error("a pipeline has no won status 142")' "$work/status.json" "$work/pipelines.json"

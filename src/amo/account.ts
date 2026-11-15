@@ -1,4 +1,5 @@
 import { CliError } from "@wirecat/cli-base"
+import { isRecord } from "./json.js"
 
 /**
  * Account hosts: `<subdomain>.amocrm.ru` (amoCRM), `<subdomain>.kommo.com` and the older `<subdomain>.amocrm.com`
@@ -16,6 +17,8 @@ export interface AmoSignIn {
   token: string
   /** The token's user, learnt at sign-in; absent for `AMO_TOKEN`. */
   userId?: string
+  /** An OAuth access token, which expires and is refreshed; absent for a long-lived token, which nothing renews. */
+  oauth?: true
 }
 
 /** `https://example.amocrm.ru`, `example.kommo.com/`: the account's origin, or a refusal that quotes nothing back. */
@@ -40,9 +43,6 @@ export const accountOrigin = (raw: string): string => {
   return url.origin
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 /** The keyring holds the address beside the token, so one entry is the whole sign-in, as b24's webhook address is. */
 export const encodeSignIn = (signIn: AmoSignIn): string => JSON.stringify(signIn)
 
@@ -65,5 +65,6 @@ export const decodeSignIn = (secret: string): AmoSignIn => {
     origin: accountOrigin(value.origin),
     token: value.token,
     ...(typeof value.userId === "string" ? { userId: value.userId } : {}),
+    ...(value.oauth === true ? { oauth: true as const } : {}),
   }
 }

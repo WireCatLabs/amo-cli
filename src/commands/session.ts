@@ -108,13 +108,13 @@ const startCommand = () =>
       const token = (await readSecret("amoCRM long-lived token: ", secretInputOf(this))).trim()
       if (!token) throw new CliError("validation_error", "no token was given")
       const who = await run((events) => accountUser(transportFor(this, { origin, token }, events)))
-      refuseDuplicate(env, keyring, profile, { host: who.account.host, userId: who.user.id })
+      refuseDuplicate(env, keyring, profile, { host: who.account, userId: who.user.id })
       const storedIn = tokens.write(
         profile,
         encodeSignIn({ origin, token, userId: who.user.id }),
         args.credentialStorage,
       )
-      rememberAccount(IDENTITY, profile, `${who.account.host}:${who.user.id}`, env)
+      rememberAccount(IDENTITY, profile, `${who.account}:${who.user.id}`, env)
       answer(this, { profile, state: "saved", kind: "token", stored_in: storedIn, verified: true, ...who })
     })
 
@@ -138,7 +138,7 @@ const statusCommand = () =>
         state: signIn ? "saved" : "missing",
         kind: signIn ? "token" : null,
         token_from: saved?.source ?? null,
-        account: signIn ? { host: new URL(signIn.origin).host } : null,
+        account: signIn ? new URL(signIn.origin).host : null,
       }
       if (!args.check || !signIn) return answer(this, { ...status, verified: false })
       answer(this, { ...status, verified: true, ...(await withAccount(this, accountUser)) })

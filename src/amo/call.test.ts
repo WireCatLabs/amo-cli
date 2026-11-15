@@ -1,20 +1,26 @@
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { CliError } from "@wirecat/cli-base"
+import { Pacer } from "@wirecat/cli-core/sends"
 import { describe, expect, it } from "vitest"
 import { providerCall } from "./call.js"
 
-const pacer = () => {
-  const held: number[] = []
-  let waits = 0
-  return {
-    held,
-    waits: () => waits,
-    holdFor: (ms: number) => {
-      held.push(ms)
-    },
-    wait: async () => {
-      waits++
-    },
+/** A real file-backed pace on a clock the test owns, with every wait recorded instead of slept. */
+const paced = () => {
+  let clock = 1_000_000
+  const slept: number[] = []
+  const now = () => clock
+  const sleep = async (ms: number) => {
+    slept.push(ms)
+    clock += ms
   }
+  const pacer = new Pacer(
+    join(mkdtempSync(join(tmpdir(), "amo-pace-")), "pace.json"),
+    { perMinute: 300, burst: 1 },
+    now,
+  )
+  return { slept, sleep, pace: { pacer, name: "amoCRM", operation: "test", now, sleep } }
 }
 
 const failing = (errors: CliError[], answer = "done") => {
@@ -33,18 +39,29 @@ const rate = (ms: number) => new CliError("rate_limited", "slow down", { retry_a
 const lost = () => new CliError("network_error", "no answer", { retryable: true })
 
 describe("providerCall", () => {
-  it("tries a read again on a lost answer and on a refused rate, holding the pace for the asked wait", async () => {
-    const pace = pacer()
+  it("tries a read again on a lost answer and on a refused rate, waiting the asked time", async () => {
+    const { pace, sleep, slept } = paced()
     const call = failing([lost(), rate(2_000)])
-    expect(await providerCall({ write: false, send: call.send, pacer: pace })).toBe("done")
+    expect(await providerCall({ write: false, send: call.send, pace, sleep, random: () => 0 })).toBe("done")
     expect(call.sent()).toBe(3)
-    expect(pace.waits()).toBe(3)
-    expect(pace.held[1]).toBe(2_000)
+    expect(slept).toContain(2_000)
+  })
+
+  it("waits between attempts even without a pace (FIND-17)", async () => {
+    const slept: number[] = []
+    const call = failing([lost(), lost()])
+    const sleep = async (ms: number) => {
+      slept.push(ms)
+    }
+    expect(await providerCall({ write: false, send: call.send, sleep, random: () => 0.5 })).toBe("done")
+    expect(slept).toHaveLength(2)
+    expect(slept.every((ms) => ms > 0)).toBe(true)
   })
 
   it("tries a write again only on a refused rate, which amoCRM answers before doing anything", async () => {
+    const { pace, sleep } = paced()
     const call = failing([rate(1_000)])
-    expect(await providerCall({ write: true, send: call.send, pacer: pacer() })).toBe("done")
+    expect(await providerCall({ write: true, send: call.send, pace, sleep })).toBe("done")
     expect(call.sent()).toBe(2)
   })
 
@@ -68,24 +85,39 @@ describe("providerCall", () => {
 
   it("stops after its retries", async () => {
     const call = failing([lost(), lost(), lost()])
-    await expect(providerCall({ write: false, send: call.send, retries: 2 })).rejects.toMatchObject({
+    await expect(
+      providerCall({ write: false, send: call.send, retries: 2, sleep: async () => {} }),
+    ).rejects.toMatchObject({
       code: "network_error",
     })
     expect(call.sent()).toBe(3)
   })
 
-  it("refreshes a refused token once, and gives up when the refresh does", async () => {
-    const expired = () => new CliError("authentication_error", "expired", { reason: "session.expired" })
+  it("refreshes an expired OAuth token once, and gives up when the refresh does", async () => {
+    const expired = () => new CliError("authentication_error", "expired", { reason: "oauth.expired" })
     const again = failing([expired()])
     expect(await providerCall({ write: true, send: again.send, refresh: async () => true })).toBe("done")
     const twice = failing([expired(), expired()])
     await expect(providerCall({ write: false, send: twice.send, refresh: async () => true })).rejects.toMatchObject({
-      details: { reason: "session.expired" },
+      details: { reason: "oauth.expired" },
     })
     const refused = failing([expired()])
     await expect(providerCall({ write: false, send: refused.send, refresh: async () => false })).rejects.toMatchObject({
+      details: { reason: "oauth.expired" },
+    })
+  })
+
+  it("never refreshes a refused long-lived token: it stays session.expired", async () => {
+    let refreshes = 0
+    const call = failing([new CliError("authentication_error", "refused", { reason: "session.expired" })])
+    const refresh = async () => {
+      refreshes++
+      return true
+    }
+    await expect(providerCall({ write: false, send: call.send, refresh })).rejects.toMatchObject({
       details: { reason: "session.expired" },
     })
+    expect(refreshes).toBe(0)
   })
 
   it("passes on what is not a CliError untouched", async () => {

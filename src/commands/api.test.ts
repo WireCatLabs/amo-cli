@@ -49,7 +49,7 @@ describe("api call", () => {
       "api",
       "call",
       "GET /api/v4/leads",
-      "--query",
+      "--params",
       '{"filter[id][]":[301,302],"with":"contacts"}',
       "--json",
     ])
@@ -61,12 +61,13 @@ describe("api call", () => {
   })
 
   it("answers an empty list as status 204 and a null result", async () => {
-    const ran = await amo(["work", "api", "call", "GET /api/v4/tasks", "--json"])
+    const account = fakeAmo({ routes: { "GET /api/v4/tasks": () => new Response(null, { status: 204 }) } })
+    const ran = await amo(["work", "api", "call", "GET /api/v4/tasks", "--json"], { account })
     expect(ran.json().item).toMatchObject({ status: 204, result: null })
   })
 
   it("refuses a denied family before any request, and an owner's allow lifts it", async () => {
-    const account = fakeAmo()
+    const account = fakeAmo({ routes: { "GET /api/v4/talks": () => new Response(null, { status: 204 }) } })
     const denied = await amo(["work", "api", "call", "GET /api/v4/contacts/chats", "--json"], { account })
     expect(denied.json()).toMatchObject({
       error: { code: "permission_error", details: { permission: "api.contacts.chats.get" } },
@@ -92,6 +93,21 @@ describe("api call", () => {
       expect(ran.json()).toMatchObject({ error: { code: "permission_error" } })
     }
     expect(reads).toEqual([])
+  })
+
+  it("refuses a raw read of clients for anyone but the administrator (SEC-6, NEED-2660 A)", async () => {
+    const employee = fakeAmo({ admin: false })
+    for (const args of [["GET /api/v4/contacts"], ["GET /api/v4/leads", "--params", '{"with":"contacts"}']]) {
+      const ran = await amo(["work", "api", "call", ...args, "--json"], { account: employee })
+      expect(ran.json()).toMatchObject({
+        error: { code: "permission_error", reason: "crm.client-reads-admin-only" },
+      })
+    }
+    expect(employee.calls.map((one) => one.operation)).toEqual(["GET /api/v4/users/{id}", "GET /api/v4/users/{id}"])
+    const lead = await amo(["work", "api", "call", "GET /api/v4/leads/301", "--json"], { account: employee })
+    expect(lead.json().item).toMatchObject({ status: 200 })
+    const admin = await amo(["work", "api", "call", "GET /api/v4/contacts", "--json"])
+    expect(admin.json().item).toMatchObject({ status: 200 })
   })
 
   it("checks the key of the command that reads the same records", async () => {
@@ -132,7 +148,8 @@ describe("api call", () => {
     )
     expect(readonly.json()).toMatchObject({ error: { code: "permission_error" } })
     rmSync(config)
-    const unasked = await amo(["work", "api", "call", "POST /api/v4/leads", "--body", '[{"name":"x"}]', "--json"], {
+    const note = '[{"entity_id":301,"note_type":"common","params":{"text":"x"}}]'
+    const unasked = await amo(["work", "api", "call", "POST /api/v4/leads/notes", "--body", note, "--json"], {
       account,
     })
     expect(unasked.code).not.toBe(0)
@@ -189,7 +206,7 @@ describe("api call", () => {
     })
   })
 
-  it.each([[["--query", "[1]"]], [["--query", '{"x":{"y":1}}']], [["--body", "{}"]]])(
+  it.each([[["--params", "[1]"]], [["--params", '{"x":{"y":1}}']], [["--body", "{}"]]])(
     "refuses a malformed %j before any request",
     async (flags) => {
       const account = fakeAmo()
@@ -200,7 +217,7 @@ describe("api call", () => {
   )
 
   it("passes on the account's refusal of a query the reference does not declare", async () => {
-    const ran = await amo(["work", "api", "call", "GET /api/v4/leads", "--query", '{"filter[nope]":true}', "--json"])
+    const ran = await amo(["work", "api", "call", "GET /api/v4/leads", "--params", '{"filter[nope]":true}', "--json"])
     expect(ran.json()).toMatchObject({ error: { code: "validation_error", details: { fields: ["filter[nope]"] } } })
   })
 })

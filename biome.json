@@ -41,7 +41,7 @@
       }
     },
     {
-      "includes": ["src/amo/operations.ts"],
+      "includes": ["src/amo/operations.ts", "src/testing/kommo-schemas.ts"],
       "linter": {
         "rules": {
           "style": {

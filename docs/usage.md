@@ -33,7 +33,7 @@ with the rights of the administrator who made it.
 and the reference page. `api call` sends one, the query and the body as JSON:
 
 ```sh
-amo work api call "GET /api/v4/leads" --query '{"limit":5,"with":"contacts"}'
+amo work api call "GET /api/v4/leads" --params '{"limit":5,"with":"loss_reason"}'
 amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run
 ```
 
