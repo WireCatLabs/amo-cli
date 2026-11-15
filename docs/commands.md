@@ -158,11 +158,11 @@ amo api call <method> [options]
 
 | Option | What it does |
 |---|---|
-| `--query <json>` | the query parameters as a JSON object, named as the reference does: {"filter[id][]":[1,2]}. |
+| `--params <json>` | the query parameters as a JSON object, named as the reference does: {"filter[id][]":[1,2]}. |
 | `--body <json>` | the request body as JSON, an array of records for most writes. |
 | `--dry-run` | show every permission this call checks, with its level, and call nothing. |
 
-**Example:** `amo work api call "GET /api/v4/leads" --query '{"limit":5,"with":"contacts"}'`, `amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run`
+**Example:** `amo work api call "GET /api/v4/leads" --params '{"limit":5,"with":"loss_reason"}'`, `amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run`
 
 ## `amo doctor`
 

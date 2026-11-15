@@ -23,7 +23,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `api list` |  | ✅ |  |
 | `api show` |  | ✅ |  |
 | `api call` |  | ✅ |  |
-| `api call` | `--query` | ✅ |  |
+| `api call` | `--params` | ✅ |  |
 | `api call` | `--body` | ✅ |  |
 | `api call` | `--dry-run` | ✅ |  |
 | `doctor` |  | ✅ |  |

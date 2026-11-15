@@ -1,3 +1,4 @@
+import type { SchemaNode } from "@wirecat/cli-base/codegen"
 import type { SpecOperation } from "./operation.js"
 
 /*
@@ -57,6 +58,11 @@ export const WITH_VALUES: Readonly<Record<string, { values: readonly string[]; s
         "https://www.amocrm.ru/developers/content/crm_platform/companies-api",
       ],
       [
+        ["GET /api/v4/events"],
+        "contact_name,lead_name,company_name,catalog_element_name,customer_name,catalog_name",
+        "https://www.amocrm.ru/developers/content/crm_platform/events-and-notes",
+      ],
+      [
         ["GET /api/v4/users", "GET /api/v4/users/{id}"],
         "role,group,uuid,amojo_id,user_rank,phone_number",
         "https://www.amocrm.ru/developers/content/crm_platform/users-api",
@@ -74,3 +80,39 @@ export const LIMITS = {
     "https://www.amocrm.ru/developers/content/crm_platform/events-and-notes",
   ],
 } as const
+
+const CUSTOM_FIELDS = "https://www.amocrm.ru/developers/content/crm_platform/custom-fields"
+
+/**
+ * Body fields the merged spec types wrongly, by name wherever they appear. Every write page types
+ * `custom_fields_values` as a string; the custom-fields page sends an array of `field_id` or `field_code` with
+ * `values`, each a `value`, `enum_id` or `enum_code`.
+ */
+export const BODY_FIELDS: Readonly<Record<string, { schema: SchemaNode; source: string }>> = {
+  custom_fields_values: {
+    source: CUSTOM_FIELDS,
+    schema: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["values"],
+        properties: {
+          field_id: { type: "integer" },
+          field_code: { type: "string" },
+          values: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [],
+              properties: {
+                value: { type: "unknown" },
+                enum_id: { type: "integer" },
+                enum_code: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+}

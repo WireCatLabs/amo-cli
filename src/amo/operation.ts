@@ -21,6 +21,8 @@ export interface SpecOperation {
 }
 
 export interface Operation extends SpecOperation {
+  /** The spec's own name for it, placeholders kept: the key of its schemas. */
+  spec: string
   method: HttpVerb
   /** The path template, with a record type named where the spec leaves it a placeholder. */
   template: string
@@ -68,6 +70,7 @@ const build = (): Operation[] => {
       byName.set(name, {
         ...one,
         name,
+        spec: one.name,
         path,
         method,
         template,

@@ -5,12 +5,5 @@
     "reason": "Names the amoCRM account the long-lived token belongs to: the token carries no address, unlike b24's webhook, so the sign-in cannot find the account without it. Review when the vocabulary names an account address: https://github.com/WireCatLabs/cli-base/issues/424",
     "owner": "@WireCatLabs",
     "review_after": "2027-02-15"
-  },
-  {
-    "rule": "option-role",
-    "target": "api call --query",
-    "reason": "amoCRM's API v4 reads filters, paging and with from the query string and writes from the body, so a raw call needs both; b24's --body alone fits only its POST-only REST. Review when the vocabulary names a raw call's query parameters.",
-    "owner": "@WireCatLabs",
-    "review_after": "2027-02-15"
   }
 ]

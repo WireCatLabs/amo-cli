@@ -23,7 +23,7 @@ import { Command } from "commander"
 import * as v from "valibot"
 import { type Matched, matchOperation, OPERATIONS, type Operation, pathOf } from "../amo/operation.js"
 import type { AmoAnswer, QueryValue } from "../amo/transport.js"
-import { apiDefault, apiKey, assignsOthers, commandKeysOf } from "../api-keys.js"
+import { apiDefault, apiKey, assignsOthers, commandKeysOf, readsClients } from "../api-keys.js"
 import { permissions } from "../config.js"
 import { contextOf, storedSignIn, withAccount } from "../context.js"
 import { IDENTITY } from "../identity.js"
@@ -65,17 +65,17 @@ const scalar = (value: unknown): string | number | undefined => {
   return undefined
 }
 
-/** `--query '{"limit":5,"filter[id][]":[1,2]}'`: names as the reference spells them; an array repeats the name. */
+/** `--params '{"limit":5,"filter[id][]":[1,2]}'`: names as the reference spells them; an array repeats the name. */
 const queryOf = (text: string | undefined): Record<string, QueryValue> => {
   if (text === undefined) return {}
   const parsed = parseApiJson(text)
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
-    throw refused("--query takes a JSON object of parameter names and values", "--query")
+    throw refused("--params takes a JSON object of parameter names and values", "--params")
   return Object.fromEntries(
     Object.entries(parsed).map(([name, value]) => {
       const values = (Array.isArray(value) ? value : [value]).map(scalar)
       if (values.some((one) => one === undefined))
-        throw refused(`--query ${name} takes a string, a number, a boolean or a list of them`, "--query")
+        throw refused(`--params ${name} takes a string, a number, a boolean or a list of them`, "--params")
       return [name, Array.isArray(value) ? (values as (string | number)[]) : (values[0] as string | number)]
     }),
   )
@@ -197,7 +197,7 @@ const callCommand = () =>
     effects: REMOTE_WRITE,
     offline: false,
     examples: [
-      `${AMO} work api call "GET /api/v4/leads" --query '{"limit":5,"with":"contacts"}'`,
+      `${AMO} work api call "GET /api/v4/leads" --params '{"limit":5,"with":"loss_reason"}'`,
       `${AMO} work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run`,
     ],
   })
@@ -208,18 +208,18 @@ const callCommand = () =>
     )
     .argument("<method>", 'the HTTP verb and path, such as "GET /api/v4/leads/42", as api list prints it')
     .option(
-      "--query <json>",
+      "--params <json>",
       'the query parameters as a JSON object, named as the reference does: {"filter[id][]":[1,2]}',
     )
     .option("--body <json>", "the request body as JSON, an array of records for most writes")
     .option("--dry-run", "show every permission this call checks, with its level, and call nothing")
-    .action(async function (this: Command, raw: string, options: { query?: string; body?: string; dryRun?: boolean }) {
+    .action(async function (this: Command, raw: string, options: { params?: string; body?: string; dryRun?: boolean }) {
       const matched = matchOperation(raw)
       const { operation } = matched
-      const query = queryOf(options.query)
+      const query = queryOf(options.params)
       const body = bodyOf(operation, options.body)
       if (options.dryRun) return preview(this, matched, body)
-      const send = { route: operation.name, ids: matched.ids, query, ...(body === undefined ? {} : { body }) }
+      const send = { route: matched, query, ...(body === undefined ? {} : { body }) }
       const shown = (answer: AmoAnswer) => ({
         method: operation.name,
         path: pathOf(matched),
@@ -244,7 +244,17 @@ const callCommand = () =>
         )
       const asked = levels.find(({ level }) => level === "ask")
       if (asked) await terminalAsker(this)(asked.one, { chatId: null, kind: "read", key: asked.one })
-      renderAnswer(this, outputFor(this), itemOf(shown(await withAccount(this, (account) => account.request(send)))))
+      const answer = await withAccount(this, async (account) => {
+        if (readsClients(operation, query) && !(await account.isAdmin()))
+          throw new CliError(
+            "permission_error",
+            `${operation.name} reads contacts or companies, which only the account's administrator reads through api ` +
+              "call: your clients come with sync, and another one with people show or organizations show, 100 a day",
+            { reason: "crm.client-reads-admin-only", sent: false },
+          )
+        return account.request(send)
+      })
+      renderAnswer(this, outputFor(this), itemOf(shown(answer)))
     })
 
 export const apiCommand = (): Command =>

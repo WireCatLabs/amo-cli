@@ -1,12 +1,16 @@
 import { LIMITS, WITH_VALUES } from "../amo/allow-list.js"
+import type { Json } from "../amo/json.js"
 import { matchOperation, type Operation } from "../amo/operation.js"
+import { bodyProblems, declaredParameter, parameterProblem } from "./spec-check.js"
 
 /*
  * A strict fake of one amoCRM account, answering through `fetch`. Its routes are the CLI's operation table, which
  * `pnpm kommo:operations` generates from contracts/kommo-openapi.json, plus the allow-list (src/amo/allow-list.ts).
- * It refuses what the account would: an unknown path or method (404), a query parameter the operation does not
- * declare, a `with` value no page names, or a `limit` past the documented maximum (400 problem+json), a wrong token
- * (401), a request past the pace (429). An empty list is 204 (amoCRM error codes, 2002). Visibly fake data only.
+ * It refuses what the account would: an unknown path or method (404); a query parameter the operation does not
+ * declare, a value of the wrong type, a `with` value no page names, a `limit` past the documented maximum, or a body
+ * that does not match the operation's schema (400 problem+json with `validation-errors`); a wrong token (401); a
+ * request past the pace (429). An empty list is 204 (amoCRM error codes, 2002). An operation it has no answer for is
+ * 501, a read too, so a test never passes on an empty account it did not ask for. Visibly fake data only.
  */
 
 /** Spelled so gitleaks lets it through; never a real token. */
@@ -14,8 +18,6 @@ export const FAKE_TOKEN = "wirecatfake0token42"
 export const FAKE_HOST = "wirecatfake.amocrm.ru"
 export const FAKE_ORIGIN = `https://${FAKE_HOST}`
 export const FAKE_USER_ID = 7001
-
-type Json = Record<string, unknown>
 
 export interface FakeCall {
   method: string
@@ -44,7 +46,11 @@ export interface FakeAmoOptions {
   loseNextWrite?: boolean
   /** Every request is answered with this status and a problem+json body. */
   failWith?: number
+  /** Answers a test adds for operations the fake has none for, by name: `{ "GET /api/v4/tasks": () => …}`. */
+  routes?: Readonly<Record<string, Handler>>
 }
+
+export type Handler = (call: FakeCall, ids: Record<string, string>) => Response
 
 const problem = (status: number, title: string, detail: string, extra: Json = {}) =>
   new Response(JSON.stringify({ title, type: `https://httpstatus.es/${status}`, status, detail, ...extra }), {
@@ -55,9 +61,11 @@ const problem = (status: number, title: string, detail: string, extra: Json = {}
 const hal = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/hal+json" } })
 
-const invalid = (path: string, detail: string) =>
+const invalid = (path: string | string[], detail: string, code = "NotSupportedChoice") =>
   problem(400, "Bad Request", detail, {
-    "validation-errors": [{ request_id: "0", errors: [{ code: "NotSupportedChoice", path, detail }] }],
+    "validation-errors": [
+      { request_id: "0", errors: (Array.isArray(path) ? path : [path]).map((one) => ({ code, path: one, detail })) },
+    ],
   })
 
 const cf = (id: number, code: string, values: [string, string][]) => ({
@@ -216,74 +224,81 @@ export const seed = () => {
   }
 }
 
+/** No page names the default page size; 50 is what a list without `limit` answers here, an assumption. */
 const DEFAULT_LIMIT = 50
 
-const isRecord = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value)
+type Data = ReturnType<typeof seed>
 
-export const fakeAmo = (options: FakeAmoOptions = {}) => {
-  const host = options.host ?? FAKE_HOST
-  const data = seed()
-  const calls: FakeCall[] = []
-  const sent: number[] = []
-  const now = options.now ?? Date.now
-  let loseNext = options.loseNextWrite === true
+const page = (call: FakeCall, name: string, all: Json[], href: string) => {
+  const ids = call.query["filter[id][]"]
+  const matching = ids ? all.filter((one) => ids.includes(String(one.id))) : all
+  const limit = Number(call.query.limit?.[0] ?? DEFAULT_LIMIT)
+  const at = Number(call.query.page?.[0] ?? 1)
+  const items = matching.slice((at - 1) * limit, at * limit)
+  if (items.length === 0) return new Response(null, { status: 204 })
+  const more = at * limit < matching.length
+  return hal({
+    _page: at,
+    _links: { self: { href }, ...(more ? { next: { href: `${href}?page=${at + 1}&limit=${limit}` } } : {}) },
+    _embedded: { [name]: items },
+  })
+}
+
+const one = (all: Json[], id: string | undefined) => {
+  const found = all.find((record) => String(record.id) === id)
+  return found ? hal(found) : problem(404, "Not Found", "Entity not found")
+}
+
+const withOf = (call: FakeCall) => new Set((call.query.with ?? []).flatMap((value) => value.split(",")))
+
+const leadOut = (call: FakeCall) => (lead: Json) => {
+  const { contacts, ...rest } = lead
+  return {
+    ...rest,
+    _embedded: {
+      tags: [],
+      companies: [],
+      ...(withOf(call).has("contacts")
+        ? { contacts: (contacts as number[]).map((id, at) => ({ id, is_main: at === 0 })) }
+        : {}),
+    },
+  }
+}
+
+/** A create makes each record; an update changes the named ones, and a record that is not there is a 404. */
+const leadWrites = (data: Data, now: () => number) => {
   let nextId = 1000
-
-  const page = (call: FakeCall, name: string, all: Json[], href: string) => {
-    const ids = call.query["filter[id][]"]
-    const matching = ids ? all.filter((one) => ids.includes(String(one.id))) : all
-    const limit = Number(call.query.limit?.[0] ?? DEFAULT_LIMIT)
-    const at = Number(call.query.page?.[0] ?? 1)
-    const items = matching.slice((at - 1) * limit, at * limit)
-    if (items.length === 0) return new Response(null, { status: 204 })
-    const more = at * limit < matching.length
-    return hal({
-      _page: at,
-      _links: { self: { href }, ...(more ? { next: { href: `${href}?page=${at + 1}&limit=${limit}` } } : {}) },
-      _embedded: { [name]: items },
+  const created = (items: Json[]) =>
+    items.map((item) => {
+      const lead = { ...data.leads[0], ...item, id: ++nextId, contacts: [] } as Data["leads"][number]
+      data.leads.push(lead)
+      return { id: lead.id, request_id: String(item.request_id ?? lead.id) }
     })
-  }
-
-  const one = (all: Json[], id: string | undefined) => {
-    const found = all.find((record) => String(record.id) === id)
-    return found ? hal(found) : problem(404, "Not Found", "Entity not found")
-  }
-
-  const withOf = (call: FakeCall) => new Set((call.query.with ?? []).flatMap((one) => one.split(",")))
-
-  const leadOut = (call: FakeCall) => (lead: Json) => {
-    const { contacts, ...rest } = lead
-    return {
-      ...rest,
-      _embedded: {
-        tags: [],
-        companies: [],
-        ...(withOf(call).has("contacts")
-          ? { contacts: (contacts as number[]).map((id, at) => ({ id, is_main: at === 0 })) }
-          : {}),
-      },
-    }
-  }
-
-  const writeLeads = (body: unknown, id?: string) => {
-    const items = id === undefined ? body : [{ ...(isRecord(body) ? body : {}), id: Number(id) }]
-    if (!Array.isArray(items) || !items.every(isRecord)) return invalid("0", "The body must be an array of leads")
-    const done = items.map((item) => {
-      if (item.id === undefined) {
-        const lead = { ...data.leads[0], ...item, id: ++nextId, contacts: [] } as (typeof data.leads)[number]
-        data.leads.push(lead)
-        return { id: lead.id, request_id: String(item.request_id ?? lead.id) }
-      }
-      const lead = data.leads.find((record) => record.id === Number(item.id))
-      if (!lead) return undefined
+  const updated = (items: Json[]) => {
+    const found = items.map((item) => data.leads.find((record) => record.id === Number(item.id)))
+    if (found.some((lead) => lead === undefined)) return undefined
+    return items.map((item, at) => {
+      const lead = found[at] as Data["leads"][number]
       Object.assign(lead, item, { updated_at: Math.floor(now() / 1000) })
       return { id: lead.id, updated_at: lead.updated_at }
     })
-    if (done.some((one) => one === undefined)) return problem(404, "Not Found", "Entity not found")
-    return hal({ _links: { self: { href: `${FAKE_ORIGIN}/api/v4/leads` } }, _embedded: { leads: done } })
   }
+  const answer = (done: unknown[] | undefined) =>
+    done
+      ? hal({ _links: { self: { href: `${FAKE_ORIGIN}/api/v4/leads` } }, _embedded: { leads: done } })
+      : problem(404, "Not Found", "Entity not found")
+  return {
+    create: (call: FakeCall) => answer(created(call.body as Json[])),
+    update: (call: FakeCall) => answer(updated(call.body as Json[])),
+    updateOne: (call: FakeCall, ids: Record<string, string>) =>
+      answer(updated([{ ...(call.body as Json), id: Number(ids.id) }])),
+  }
+}
 
-  const handlers: Record<string, (call: FakeCall, ids: Record<string, string>) => Response> = {
+const handlersFor = (data: Data, options: FakeAmoOptions, now: () => number): Record<string, Handler> => {
+  const leads = leadWrites(data, now)
+  const refusedUsers = () => problem(403, "Forbidden", "Access denied")
+  return {
     "GET /api/v4/account": (call) => {
       const asked = withOf(call)
       return hal({
@@ -293,18 +308,15 @@ export const fakeAmo = (options: FakeAmoOptions = {}) => {
       })
     },
     "GET /api/v4/users": (call) =>
-      options.admin === false
-        ? problem(403, "Forbidden", "Access denied")
-        : page(call, "users", data.users, `${FAKE_ORIGIN}/api/v4/users`),
-    "GET /api/v4/users/{id}": (_, ids) =>
-      options.admin === false ? problem(403, "Forbidden", "Access denied") : one(data.users, ids.id),
+      options.admin === false ? refusedUsers() : page(call, "users", data.users, `${FAKE_ORIGIN}/api/v4/users`),
+    "GET /api/v4/users/{id}": (_, ids) => (options.admin === false ? refusedUsers() : one(data.users, ids.id)),
     "GET /api/v4/leads/pipelines": () =>
       hal({
         _total_items: data.pipelines.length,
         _embedded: {
           pipelines: data.pipelines.map((pipeline) => ({
             ...pipeline,
-            _embedded: { statuses: data.statuses.filter((one) => one.pipeline_id === pipeline.id) },
+            _embedded: { statuses: data.statuses.filter((status) => status.pipeline_id === pipeline.id) },
           })),
         },
       }),
@@ -313,14 +325,14 @@ export const fakeAmo = (options: FakeAmoOptions = {}) => {
       page(
         call,
         "statuses",
-        data.statuses.filter((one) => String(one.pipeline_id) === ids.pipeline_id),
+        data.statuses.filter((status) => String(status.pipeline_id) === ids.pipeline_id),
         `${FAKE_ORIGIN}/api/v4/leads/pipelines/${ids.pipeline_id}/statuses`,
       ),
     "GET /api/v4/leads": (call) => page(call, "leads", data.leads.map(leadOut(call)), `${FAKE_ORIGIN}/api/v4/leads`),
     "GET /api/v4/leads/{id}": (call, ids) => one(data.leads.map(leadOut(call)), ids.id),
-    "POST /api/v4/leads": (call) => writeLeads(call.body),
-    "PATCH /api/v4/leads": (call) => writeLeads(call.body),
-    "PATCH /api/v4/leads/{id}": (call, ids) => writeLeads(call.body, ids.id),
+    "POST /api/v4/leads": leads.create,
+    "PATCH /api/v4/leads": leads.update,
+    "PATCH /api/v4/leads/{id}": leads.updateOne,
     "GET /api/v4/contacts": (call) => page(call, "contacts", data.contacts, `${FAKE_ORIGIN}/api/v4/contacts`),
     "GET /api/v4/contacts/{id}": (_, ids) => one(data.contacts, ids.id),
     "GET /api/v4/companies": (call) => page(call, "companies", data.companies, `${FAKE_ORIGIN}/api/v4/companies`),
@@ -333,25 +345,47 @@ export const fakeAmo = (options: FakeAmoOptions = {}) => {
       ]),
     ),
   }
+}
 
-  /** A query the operation does not declare, a `with` no page names, or a `limit` past the maximum. */
-  const queryRefusal = (operation: Operation, call: FakeCall): Response | undefined => {
-    for (const [name, values] of Object.entries(call.query)) {
-      if (!operation.query.includes(name)) return invalid(name, `${operation.name} takes no ${name}`)
-      if (name === "with") {
-        const allowed = WITH_VALUES[operation.name]?.values ?? []
-        const wrong = values.flatMap((one) => one.split(",")).find((one) => !allowed.includes(one))
-        if (wrong !== undefined) return invalid("with", `${operation.name} takes no with=${wrong}`)
-      }
-      if (name === "limit" || name === "page") {
-        const number = Number(values[0])
-        const most = name === "limit" ? (LIMITS.byPath[operation.template] ?? LIMITS.default) : Number.MAX_SAFE_INTEGER
-        if (values.length !== 1 || !/^[0-9]+$/.test(values[0] ?? "") || number < 1 || number > most)
-          return invalid(name, `${name} takes a whole number from 1 to ${most}`)
-      }
+/** A query the operation does not declare, a value of the wrong type, a `with` no page names, a `limit` too big. */
+const queryRefusal = (operation: Operation, call: FakeCall): Response | undefined => {
+  for (const [name, values] of Object.entries(call.query)) {
+    const declared = declaredParameter(operation, name)
+    if (declared === undefined) return invalid(name, `${operation.name} takes no ${name}`)
+    if (name === "with") {
+      const allowed = WITH_VALUES[operation.name]?.values ?? []
+      const wrong = values.flatMap((value) => value.split(",")).find((value) => !allowed.includes(value))
+      if (wrong !== undefined) return invalid("with", `${operation.name} takes no with=${wrong}`)
+      continue
     }
-    return undefined
+    if (name === "limit" || name === "page") {
+      const number = Number(values[0])
+      const most = name === "limit" ? (LIMITS.byPath[operation.template] ?? LIMITS.default) : Number.MAX_SAFE_INTEGER
+      if (values.length !== 1 || !/^[0-9]+$/.test(values[0] ?? "") || number < 1 || number > most)
+        return invalid(name, `${name} takes a whole number from 1 to ${most}`)
+      continue
+    }
+    const wrong = parameterProblem(operation, declared, name, values)
+    if (wrong) return invalid(name, `${name} is not the type the reference gives`, "InvalidType")
   }
+  return undefined
+}
+
+const bodyRefusal = (operation: Operation, body: unknown): Response | undefined => {
+  if (body === undefined) return undefined
+  if (!operation.body) return invalid("body", `${operation.name} takes no body`)
+  const wrong = bodyProblems(operation, body)
+  return wrong.length ? invalid(wrong, `the body does not match ${operation.name}`, "InvalidType") : undefined
+}
+
+export const fakeAmo = (options: FakeAmoOptions = {}) => {
+  const host = options.host ?? FAKE_HOST
+  const data = seed()
+  const calls: FakeCall[] = []
+  const sent: number[] = []
+  const now = options.now ?? Date.now
+  let loseNext = options.loseNextWrite === true
+  const handlers = { ...handlersFor(data, options, now), ...options.routes }
 
   const answer = (call: FakeCall, init: RequestInit, url: URL): Response => {
     if (options.blocked) return new Response("<html><body>403 Forbidden</body></html>", { status: 403 })
@@ -371,13 +405,12 @@ export const fakeAmo = (options: FakeAmoOptions = {}) => {
     }
     const { operation, ids } = matched
     call.operation = operation.name
-    const refusal = queryRefusal(operation, call)
+    const refusal = queryRefusal(operation, call) ?? bodyRefusal(operation, call.body)
     if (refusal) return refusal
-    if (call.body !== undefined && !operation.body) return invalid("body", `${operation.name} takes no body`)
     const handler = handlers[operation.name]
-    if (handler) return handler(call, ids)
-    if (operation.method === "GET" && !operation.template.endsWith("}")) return new Response(null, { status: 204 })
-    return problem(501, "Not Implemented", `the fake has no answer for ${operation.name}`)
+    return handler
+      ? handler(call, ids)
+      : problem(501, "Not Implemented", `the fake has no answer for ${operation.name}; a test adds one with routes`)
   }
 
   const fetch = async (input: string | URL | Request, init: RequestInit = {}): Promise<Response> => {

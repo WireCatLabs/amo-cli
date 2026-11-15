@@ -8,7 +8,7 @@ import {
   renderAnswer,
   terminalAsker,
 } from "@wirecat/cli-core/cli"
-import { guardedWrite, guardFor, keyedGuard, type Level, levelFor, newOperationId } from "@wirecat/cli-core/sends"
+import { guardedWrite, guardFor, keyedGuard, levelFor, newOperationId } from "@wirecat/cli-core/sends"
 import type { Command } from "commander"
 import type { AmoTransport } from "../amo/transport.js"
 import { permissions } from "../config.js"
@@ -19,8 +19,6 @@ export interface Write {
   key: string
   /** Keys checked beside `key`, such as the command key a raw `api call` does the same as. */
   extra?: readonly string[]
-  /** The built-in levels, when the call adds its own key's. */
-  defaults?: Readonly<Record<string, Level>>
   act: (account: AmoTransport, operationId: string) => Promise<Record<string, unknown>>
 }
 
@@ -28,7 +26,8 @@ export interface Write {
  * Every write's one path, as b24's and gcal-cli's: the read-only lock, the profile's levels, one question for every
  * key at `ask`, the send journal, and an `operation_id` in the answer (WC-PERM-13, WC-OUT-10).
  */
-export const write = async (command: Command, { key, extra = [], defaults = permissions.defaults, act }: Write) => {
+export const write = async (command: Command, { key, extra = [], act }: Write) => {
+  const defaults = permissions.defaults
   const { env, settings, run } = contextOf(command)
   const lock = readOnlyLockOf(IDENTITY, env)
   if (lock) throw readOnlyRefusal(lock, "change the amoCRM account")
