@@ -1,5 +1,5 @@
 import { LIMITS, WITH_VALUES } from "../amo/allow-list.js"
-import type { Json } from "../amo/json.js"
+import { isRecord, type Json } from "../amo/json.js"
 import { matchOperation, type Operation } from "../amo/operation.js"
 import { bodyProblems, declaredParameter, parameterProblem } from "./spec-check.js"
 
@@ -371,9 +371,20 @@ const queryRefusal = (operation: Operation, call: FakeCall): Response | undefine
   return undefined
 }
 
+/**
+ * A mass update names each record by `id`: the leads, sources and notes pages mark it required, the contacts,
+ * companies and tasks pages leave it out of the schema, and without it nothing says which record to change.
+ */
+const missingIds = (operation: Operation, body: unknown): string[] =>
+  operation.method === "PATCH" && !operation.template.endsWith("}") && Array.isArray(body)
+    ? body.flatMap((item, at) => (isRecord(item) && item.id === undefined ? [`${at}.id`] : []))
+    : []
+
 const bodyRefusal = (operation: Operation, body: unknown): Response | undefined => {
   if (body === undefined) return undefined
   if (!operation.body) return invalid("body", `${operation.name} takes no body`)
+  const unnamed = missingIds(operation, body)
+  if (unnamed.length) return invalid(unnamed, `${operation.name} changes records named by id`, "NotBlank")
   const wrong = bodyProblems(operation, body)
   return wrong.length ? invalid(wrong, `the body does not match ${operation.name}`, "InvalidType") : undefined
 }

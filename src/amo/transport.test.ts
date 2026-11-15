@@ -76,6 +76,20 @@ describe("AmoTransport", () => {
     expect(account.calls).toEqual([])
   })
 
+  it("waits no longer than the run's deadline leaves, less a second for the request", async () => {
+    let ends = 0
+    const { amo, account, pacer, now } = transport({}, FAKE_TOKEN, FAKE_ORIGIN, {
+      deadline: () => ({ endsAt: ends }),
+    })
+    ends = now() + 6_000
+    await pacer.holdFor(8_000)
+    await expect(amo.request({ route: at("GET /api/v4/account") })).rejects.toMatchObject({
+      code: "rate_limited",
+      details: { retry_after_ms: 8_000 },
+    })
+    expect(account.calls).toEqual([])
+  })
+
   it("holds every process's pace after a block, so the next call is not sent", async () => {
     const blocked = transport({ blocked: true })
     await expect(blocked.amo.request({ route: at("GET /api/v4/account") })).rejects.toMatchObject({

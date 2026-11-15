@@ -84,6 +84,7 @@ export const transportFor = (command: Command, signIn: AmoSignIn, events?: Event
     ...(environment.fetch ? { fetch: environment.fetch } : {}),
     ...(environment.signal ? { signal: environment.signal } : {}),
     ...(environment.sleep ? { sleep: environment.sleep } : {}),
+    ...(environment.deadline ? { deadline: environment.deadline } : {}),
     // amoCRM counts per integration and account: two profiles on one account share one pace.
     pacer: new Pacer(pacePathFor(IDENTITY, `account-${new URL(signIn.origin).hostname}`, env), ACCOUNT_PACE),
   })
