@@ -23,7 +23,7 @@ import { Command } from "commander"
 import * as v from "valibot"
 import { type Matched, matchOperation, OPERATIONS, type Operation, pathOf } from "../amo/operation.js"
 import type { AmoAnswer, QueryValue } from "../amo/transport.js"
-import { apiDefault, apiKey, assignsOthers, commandKeysOf, readsClients } from "../api-keys.js"
+import { apiDefault, apiKey, assignsOthers, commandKeysOf, employeeRuleOf, readsClients } from "../api-keys.js"
 import { permissions } from "../config.js"
 import { contextOf, storedSignIn, withAccount } from "../context.js"
 import { IDENTITY } from "../identity.js"
@@ -156,8 +156,11 @@ const keysOf = (command: Command, matched: Matched, body: unknown) => {
   }
 }
 
-/** What `--dry-run` shows, as b24's `api call`: every key the real call checks and its level. */
-const preview = (command: Command, matched: Matched, body: unknown) => {
+/**
+ * What `--dry-run` shows, as b24's `api call`: every key the real call checks and its level, and the rules only the
+ * account's administrator passes, which the preview names without asking the account who signs in.
+ */
+const preview = (command: Command, matched: Matched, body: unknown, query: Record<string, QueryValue>) => {
   const { settings } = contextOf(command)
   const { key, extra } = keysOf(command, matched, body)
   const writes = matched.operation.effect !== "read"
@@ -178,6 +181,10 @@ const preview = (command: Command, matched: Matched, body: unknown) => {
         request: `${matched.operation.method} ${pathOf(matched)}`,
         permission: checked[0],
         permissions: checked,
+        adminOnly: [
+          ...(readsClients(matched.operation, query) ? ["crm.client-reads-admin-only"] : []),
+          ...(employeeRuleOf(matched.operation, body) ? [`employee.${employeeRuleOf(matched.operation, body)}`] : []),
+        ],
         validation: {
           arguments: "parsed",
           permissions: "checked",
@@ -218,7 +225,7 @@ const callCommand = () =>
       const { operation } = matched
       const query = queryOf(options.params)
       const body = bodyOf(operation, options.body)
-      if (options.dryRun) return preview(this, matched, body)
+      if (options.dryRun) return preview(this, matched, body, query)
       const send = { route: matched, query, ...(body === undefined ? {} : { body }) }
       const shown = (answer: AmoAnswer) => ({
         method: operation.name,

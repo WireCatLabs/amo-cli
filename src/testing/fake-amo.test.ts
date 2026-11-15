@@ -63,6 +63,14 @@ describe("the fake account refuses what amoCRM refuses", () => {
       expect([path, response.status]).toEqual([path, 400])
       expect(await response.json()).toMatchObject({ "validation-errors": [{ errors: [{ path: field }] }] })
     }
+    for (const [method, path] of [
+      ["POST", "/api/v4/leads"],
+      ["PATCH", "/api/v4/leads/301"],
+      ["PATCH", "/api/v4/leads"],
+    ] as const) {
+      const response = await get(account, path, { method })
+      expect([method, path, response.status]).toEqual([method, path, 400])
+    }
     expect(account.data.leads.find((one) => one.id === 301)?.price).toBe(3010)
     expect(account.data.leads).toHaveLength(4)
     const fine = [{ name: "x", price: 5, custom_fields_values: [{ field_id: 9101, values: [{ enum_id: 11 }] }] }]

@@ -13,5 +13,5 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
   permission key, query parameters in `--params` and the body in `--body`. Own reads and lead, contact and company
   changes are allowed, other reads, writes and deletes ask; conversations, chats, Salesbots, webhooks, widgets,
   calls, adding users and task writes are denied until you allow them.
-- Only the account's administrator deletes, sets a field to nothing, unlinks records or reads contacts and companies
-  through `api call`, whatever the permissions say.
+- Only the account's administrator deletes, sets a field to nothing, unlinks records or reads contacts, companies, notes
+  and events through `api call`, whatever the permissions say.
