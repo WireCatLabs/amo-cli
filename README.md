@@ -17,17 +17,10 @@ amo work api call "GET /api/v4/leads" --params '{"limit":5}'
 ```
 
 `https://example.amocrm.ru` is your account's address: `<subdomain>.amocrm.ru`, `<subdomain>.kommo.com` or
-`<subdomain>.amocrm.com`, kept exactly as you give it. Make the token in a private integration:
-
-- **amoCRM (`.amocrm.ru`)**: амоМаркет → ⋯ at the top left → «Создать интеграцию». Give a name, a description and a
-  Redirect URI (any https page you can open will do if you only use the token; `https://wirecat.dev/webhooks/apps/amo-callback`
-  if you also sign in with `--client-id`), and tick «Доступ к данным аккаунта». Save, open the «Ключи» tab →
-  «Сгенерировать токен», pick the end date and copy it: amoCRM shows it once. On an account whose owner is not
-  marked technical, amoCRM first asks you to sign a waiver of technical support for a private integration
-  ([integrations](https://www.amocrm.ru/developers/content/integrations/intro),
-  [step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
-- **Kommo (`.kommo.com`, `.amocrm.com`)**: Settings → Integrations → Create integration (a private one), then its Keys
-  and scopes tab → Generate a long-lived token; Kommo shows it once.
+`<subdomain>.amocrm.com`, kept exactly as you give it. The token comes from a private integration that an account
+administrator makes once, in amoCRM (амоМаркет → ⋯ → «Создать интеграцию») or Kommo (Settings → Integrations →
+Create integration). Every step, the browser sign-in through the same integration and which one to choose are in
+[install and connect](docs/installation.md).
 
 `work` is a profile: a name you choose for one account. It is the first word of every command that uses an account,
 and none is ever assumed. You need Node.js 22.16 or a later 22.x, or Node.js 24 or later. `amo doctor` needs no
@@ -87,7 +80,8 @@ refused. For one run, `AMO_TOKEN` with `AMO_HOST` take the place of the saved si
 key comes from `AMO_AMOCRM_CLIENT_SECRET` or a hidden prompt, the browser asks you to allow it, and `amo` renews the
 access token itself. Set the integration's Redirect URI to `https://wirecat.dev/webhooks/apps/amo-callback`.
 
-amoCRM has no call that revokes a token: revoke it on the integration's «Ключи» tab (Kommo: Keys and scopes).
+amoCRM has no call that revokes a token: revoke it on the integration's «Выданные доступы» tab → «Отозвать
+доступ» (Kommo: Authorization → Revoke access).
 `amo work account remove --keep-data` (or `--delete-data`) forgets the profile's sign-in and files on this computer;
 `--delete-data` also deletes the account's copy from the store, and refuses while another profile reads the same
 account. `amo work schedule command crm --every 1h -- sync` keeps the copy fresh with a timer.
@@ -141,7 +135,7 @@ Start with `amo doctor`, then [troubleshooting](docs/troubleshooting.md).
 
 ## Documentation
 
-- [Install](docs/installation.md) · [Use it](docs/usage.md) · [Settings](docs/configuration.md) ·
+- [Install and connect](docs/installation.md) · [Use it](docs/usage.md) · [Settings](docs/configuration.md) ·
   [Security](docs/security.md) · [Commands](docs/commands.md) · [Troubleshooting](docs/troubleshooting.md)
 - The design: [docs/dev/DESIGN.md](docs/dev/DESIGN.md).
 

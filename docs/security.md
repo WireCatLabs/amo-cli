@@ -7,8 +7,9 @@ What WireCat CLIs share — the keyring, permissions, MCP and what never reaches
 the account's long-lived token and address in the OS keyring, or in a private file where no keyring works; the token
 goes only into the request's Authorization header, never into an address, an answer, a run record or the send journal.
 `amo` reaches only the account you signed in to, a host under `amocrm.ru`, `amocrm.com` or `kommo.com`, and never
-follows a redirect. amoCRM has no call that revokes a token: after a leak, revoke it on the integration's Keys and
-scopes tab.
+follows a redirect. amoCRM has no call that revokes a token: after a leak, revoke it on the integration's
+«Выданные доступы» tab (Kommo: Authorization), as [install and connect](installation.md#sign-out-and-revoke-access)
+shows.
 
 `amo work mcp serve --http` listens on `127.0.0.1` only, for browser apps that reach it through your own
 tunnel. Each app logs in with a one-time code, and the server keeps a hash of each login it gives, in the state
