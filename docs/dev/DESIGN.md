@@ -297,6 +297,18 @@ the main pipeline").
   - one `GET /api/v4/events?filter[type][]=lead_status_changed`, to see whether events come newest or oldest first;
   - one by-id read of a deleted lead: 204, or a record with `is_deleted`;
   - `mode=post_message`, a refresh after 24 hours, and the answer of an account without the add-on.
+- The Desktop setup flow (`src/setup/flow.ts`, texts in `src/setup/texts.*.json`) is defined and tested but not
+  mounted. cli-core 0.675.0's `setup apply` keeps the bare token and remembers the profile's name, which amo's
+  sign-in cannot read, and prints whatever the check returns. The check returns `keep` (the sign-in with the address
+  and user, and `<host>:<user>`), which [cli-core#3005](https://github.com/WireCatLabs/cli-core/pull/3005) honours.
+  Mount `setupCommand(amoSetup)` in `program.ts` at the bump that carries it, with an apply → `session status
+  --check` round-trip test and `cli-dev lint` over the setup group. No image blocks until the screenshots exist.
+- Desktop shows links only to wirecat.dev, github.com/WireCatLabs and the catalog entry's domains: amoCRM's guide
+  links in the setup texts are plain text unless amo's catalog entry lists amocrm.ru.
+- The checkbox «Доступ к данным аккаунта» comes from the README; amoCRM's step-by-step page names only the group
+  «Предоставить доступ». Confirm on the live form.
+- At the next cli-core bump: #2997's CRM changes (breaking) are on main, and the SEC-197 change will need `user:
+  signInOf(command).userId` in the CrmRun built in `openProfile` (`src/commands/crm-shared.ts`).
 - How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
 - The event types `contact_deleted`, `company_deleted` and their `_restored` follow the `lead_deleted` pattern; no
   live answer has been seen.
