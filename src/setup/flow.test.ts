@@ -1,42 +1,36 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { Readable } from "node:stream"
 import { type KeyringStore, memoryKeyring } from "@wirecat/cli-base"
-import { ProfileTokenStore, run, setupCommand, setupProblems } from "@wirecat/cli-core/cli"
+import { ProfileTokenStore, setupProblems } from "@wirecat/cli-core/cli"
 import { setupFileProblems } from "@wirecat/cli-core/testing"
 import { describe, expect, it } from "vitest"
 import { encodeSignIn } from "../amo/account.js"
 import { configuration } from "../config.js"
 import { IDENTITY } from "../identity.js"
-import { definition } from "../program.js"
-import { FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, fakeAmo } from "../testing/fake-amo.js"
-import { FAKE_SIGN_IN } from "../testing/harness.js"
+import { FAKE_HOST, FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID } from "../testing/fake-amo.js"
+import { amo, FAKE_SIGN_IN } from "../testing/harness.js"
 import { amoSetup } from "./flow.js"
 import en from "./texts.en.json" with { type: "json" }
 import es from "./texts.es.json" with { type: "json" }
 import ru from "./texts.ru.json" with { type: "json" }
 
-// Mounted here only: on cli-core 0.675.0 apply keeps the bare token, which amo's sign-in cannot read.
-const apply = async (answers: Record<string, unknown>, keyring: KeyringStore = memoryKeyring()) => {
-  const root = mkdtempSync(join(tmpdir(), "amo-setup-"))
-  const out: string[] = []
-  const err: string[] = []
-  const program = definition()
-  const code = await run(
-    ["work", "setup", "run", "apply", "--json", "--answer-stdin"],
-    { ...program, commands: () => [...program.commands(), setupCommand(amoSetup)] },
-    {
-      streams: { data: (text) => out.push(text), diagnostic: (text) => err.push(text) },
-      tty: false,
-      keyring,
-      env: { ...process.env, AMO_CONFIG_DIR: join(root, "config"), AMO_STATE_DIR: join(root, "state") },
-      stdin: Object.assign(Readable.from([`${JSON.stringify(answers)}\n`]), { isTTY: false }),
-      fetch: fakeAmo().fetch,
-    } as Parameters<typeof run>[2],
-  )
-  const error = () => JSON.parse(err.at(-1) ?? "{}").error
-  return { code, out: out.join(""), err: err.join(""), error, keyring }
+const configs = () => mkdtempSync(join(tmpdir(), "amo-setup-"))
+
+const apply = async (
+  answers: Record<string, unknown>,
+  keyring: KeyringStore = memoryKeyring(),
+  env = { AMO_CONFIG_DIR: configs() },
+) => {
+  const ran = await amo(["work", "setup", "run", "apply", "--json", "--answer-stdin"], {
+    keyring,
+    env,
+    stdin: `${JSON.stringify(answers)}\n`,
+  })
+  // The harness joins stderr's writes with nothing between them, and the sign-in events come first.
+  const error = () =>
+    ran.err.includes('{"error"') ? JSON.parse(ran.err.slice(ran.err.lastIndexOf('{"error"'))).error : undefined
+  return { ...ran, error, keyring, env }
 }
 
 describe("the setup flow", () => {
@@ -70,6 +64,54 @@ describe("the setup flow", () => {
     const { code, error } = await apply({ host: FAKE_ORIGIN }, memoryKeyring({ "amo-cli:token:work": other }))
     expect(code).not.toBe(0)
     expect(error()).toMatchObject({ code: "validation_error", reason: "account.token-missing" })
+  })
+
+  it("**saves a sign-in that session start reads**: the address and the token's user beside the token", async () => {
+    const saved = await apply({ host: FAKE_ORIGIN, token: FAKE_TOKEN })
+    expect([saved.code, saved.error()]).toEqual([0, undefined])
+    expect(saved.json()).toMatchObject({ item: { outcome: "ok", saved: ["host"], secrets: ["token"] } })
+    expect(saved.out).not.toContain(FAKE_TOKEN)
+    expect(saved.out).not.toContain("keep")
+    const status = await amo(["work", "session", "status", "--check", "--json"], {
+      keyring: saved.keyring,
+      env: saved.env,
+    })
+    expect(status.json()).toMatchObject({
+      item: { state: "saved", kind: "token", account: FAKE_HOST, verified: true, user: { id: String(FAKE_USER_ID) } },
+    })
+    const shown = await amo(["work", "setup", "show", "--json"], { keyring: saved.keyring, env: saved.env })
+    expect(shown.json()).toMatchObject({ item: { values: { host: FAKE_ORIGIN, token: { set: true } } } })
+  })
+
+  it("**apply --dry-run stops at a bad address and saves nothing; apply saves as run apply does**", async () => {
+    const env = { AMO_CONFIG_DIR: configs() }
+    const keyring = memoryKeyring()
+    const dry = await amo(["work", "setup", "apply", "--dry-run", "--json"], {
+      keyring,
+      env,
+      stdin: JSON.stringify({ host: "https://www.amocrm.ru" }),
+    })
+    expect(dry.json()).toMatchObject({ item: { valid: false, at: "account", errors: [{ input: "host" }] } })
+    const saved = await amo(["work", "setup", "apply", "--json"], {
+      keyring,
+      env,
+      stdin: JSON.stringify({ host: FAKE_ORIGIN, token: FAKE_TOKEN }),
+    })
+    expect(saved.json()).toMatchObject({ item: { outcome: "ok", secrets: ["token"] } })
+    expect(new ProfileTokenStore({ app: IDENTITY, env: {}, keyring }).signedIn("work")).toBe(true)
+  })
+
+  it("**session start keeps the address the flow shows** when the profile is edited", async () => {
+    const env = { AMO_CONFIG_DIR: configs() }
+    const keyring = memoryKeyring()
+    const started = await amo(["work", "session", "start", "--host", FAKE_ORIGIN, "--json"], {
+      keyring,
+      env,
+      stdin: FAKE_TOKEN,
+    })
+    expect(started.code).toBe(0)
+    const shown = await amo(["work", "setup", "show", "--json"], { keyring, env })
+    expect(shown.json()).toMatchObject({ item: { values: { host: FAKE_ORIGIN } } })
   })
 
   it("**editing the same account without a new token checks the kept one**", async () => {

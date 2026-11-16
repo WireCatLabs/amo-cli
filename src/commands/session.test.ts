@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { memoryKeyring } from "@wirecat/cli-base"
 import { describe, expect, it } from "vitest"
 import { accountOrigin, decodeSignIn } from "../amo/account.js"
@@ -156,7 +159,11 @@ describe("session status, end and list", () => {
   it("says missing for a profile that never signed in, and a check needs a sign-in", async () => {
     const ran = await amo(["work", "session", "status", "--check", "--json"], { keyring: memoryKeyring() })
     expect(ran.json().item).toMatchObject({ state: "missing", kind: null, account: null, verified: false })
-    const call = await amo(["work", "api", "call", "GET /api/v4/account", "--json"], { keyring: memoryKeyring() })
+    // Its own config folder: an earlier sign-in in this file left `work`'s host there, which makes the profile known.
+    const call = await amo(["work", "api", "call", "GET /api/v4/account", "--json"], {
+      keyring: memoryKeyring(),
+      env: { AMO_CONFIG_DIR: mkdtempSync(join(tmpdir(), "config-")) },
+    })
     expect(call.json()).toMatchObject({ error: { reason: "profile.unknown" } })
   })
 

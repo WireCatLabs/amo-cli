@@ -14,6 +14,7 @@ describe("every option of the CRM commands runs against the fake account", () =>
       ["deals", "list", "--limit", "1", "--page", "2"],
       ["deals", "list", "--format", "csv"],
       ["pipelines", "show", "Продажи"],
+      ["pipelines", "show", "Продажи", "--since-time", "2026-01-01", "--until-time", "2026-12-31"],
       ["stages", "list", "kind:deal"],
       ["people", "list", "--limit", "1", "--page", "2"],
       ["people", "list", "--format", "csv"],
@@ -57,6 +58,8 @@ describe("every option of the CRM commands runs against the fake account", () =>
       ["people", "create", "--name", "Anna Example", "--owner", owner, "--field", "Примечание=Example"],
       ["people", "update", "401", "--name", "Anna", "--first-name", "Anna", "--owner", owner],
       ["people", "update", "401", "--field", "Примечание=Example"],
+      ["people", "create", "--first-name", "Anna", "--email", "anna@example.test", "--phone", "+7 900 000-00-09"],
+      ["people", "update", "401", "--email", "anna@example.test", "--phone", "+7 900 000-00-09"],
       ["organizations", "create", "--name", "Example", "--owner", owner, "--field", "Примечание=Example"],
       ["organizations", "update", "501", "--owner", owner, "--field", "Примечание=Example"],
     ])
@@ -67,6 +70,11 @@ describe("every option of the CRM commands runs against the fake account", () =>
     for (const argv of [
       ["people", "create", "--first-name", "Anna", "--position", "Buyer"],
       ["people", "update", "401", "--position", "Buyer"],
+      // The fake account, as the field table describes, has no phone or e-mail field on companies.
+      ["organizations", "create", "--name", "Example", "--email", "office@example.test"],
+      ["organizations", "create", "--name", "Example", "--phone", "+7 900 000-00-09"],
+      ["organizations", "update", "501", "--email", "office@example.test"],
+      ["organizations", "update", "501", "--phone", "+7 900 000-00-09"],
     ])
       expect(await codeOf(account, argv), argv.join(" ")).toBe(2)
     expect(account.writes()).toBe(sent)

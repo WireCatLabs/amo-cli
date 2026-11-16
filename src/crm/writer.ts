@@ -140,24 +140,34 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
     if (given.firstName !== undefined) fields.first_name = given.firstName ?? ""
     if (given.lastName !== undefined) fields.last_name = given.lastName ?? ""
     if (given.owner != null) fields.responsible_user_id = numericId(given.owner, "--owner")
-    const defined = given.emails || given.phones || given.custom ? await source.fields("person") : []
+    const values = await valuesOf("person", given, current?.contactTypes)
+    if (values.length) fields.custom_fields_values = values
+    return fields
+  }
+
+  /** The custom values, and each list of phones or e-mails in the field that holds it, replacing the whole list. */
+  const valuesOf = async (
+    kind: "person" | "organization",
+    given: CrmPersonFields | CrmOrganizationFields,
+    kinds: Record<string, string> = {},
+  ) => {
+    if (!given.emails && !given.phones && !(given.custom && Object.keys(given.custom).length)) return []
+    const defined = await source.fields(kind)
     const values = given.custom ? customValuesOf(defined, given.custom) : []
-    const kinds = current?.contactTypes ?? {}
     for (const [holds, list] of [
       ["email", given.emails],
       ["phone", given.phones],
     ] as const) {
       if (list === undefined) continue
       const field = defined.find((one) => one.holds === holds)
-      if (!field) throw refused(`this account has no ${holds} field on contacts`)
+      if (!field) throw refused(`this account has no ${holds} field on ${kind === "person" ? "contacts" : "companies"}`)
       // A number kept keeps its kind (MOB, HOME…); a new one is WORK, as contacts-api's PATCH example sends it.
       values.push({
         field_id: Number(field.code),
         values: list.map((value) => ({ value, enum_code: kinds[value] ?? "WORK" })) as never,
       })
     }
-    if (values.length) fields.custom_fields_values = values
-    return fields
+    return values
   }
 
   const organizationOf = async (given: CrmOrganizationFields): Promise<Raw> => {
@@ -166,8 +176,8 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
     const fields: Raw = {}
     if (given.name !== undefined) fields.name = given.name
     if (given.owner != null) fields.responsible_user_id = numericId(given.owner, "--owner")
-    if (given.custom && Object.keys(given.custom).length)
-      fields.custom_fields_values = customValuesOf(await source.fields("organization"), given.custom)
+    const values = await valuesOf("organization", given)
+    if (values.length) fields.custom_fields_values = values
     return fields
   }
 

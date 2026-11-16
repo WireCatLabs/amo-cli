@@ -417,7 +417,7 @@ amo deals list [query] [options]
 | `--page <n>` | which page, starting at 1. Default: `1`. |
 | `--format <format>` | csv: this page as a table for a spreadsheet; --json=a,b picks its columns. One of: `csv`. |
 
-**Returns:** deal — id, ref, kind, title, summary, pipeline, pipeline_name, stage, and 29 more; every field: amo commands info deals list
+**Returns:** deal — id, ref, kind, title, summary, pipeline, pipeline_name, stage, and 30 more; every field: amo commands info deals list
 
 **Example:** `amo work deals list status:open --json`, `amo work deals list stage:"Quote sent"`, `amo work deals list status:open --format csv > deals.csv`
 
@@ -433,7 +433,7 @@ amo deals show <deal>
 |---|---|---|
 | `deal` | required | deal:<id>, as a list shows it. |
 
-**Returns:** deal — id, ref, kind, title, summary, pipeline, pipeline_name, stage, and 29 more; every field: amo commands info deals show
+**Returns:** deal — id, ref, kind, title, summary, pipeline, pipeline_name, stage, and 30 more; every field: amo commands info deals show
 
 **Example:** `amo work deals show deal:12`
 
@@ -549,7 +549,7 @@ amo pipelines list [query]
 |---|---|---|
 | `query` | optional | field:value terms that narrow the list — the fields are below. |
 
-**Returns:** pipeline — id, ref, name, kind, account, external_id, stages, created_at, and 3 more; every field: amo commands info pipelines list
+**Returns:** pipeline — id, ref, name, kind, account, external_id, stages, created_at, and 9 more; every field: amo commands info pipelines list
 
 **Example:** `amo work pipelines list --json`, `amo work pipelines list kind:lead`
 
@@ -558,16 +558,21 @@ amo pipelines list [query]
 one pipeline as a board and a funnel: how many stand in each stage and their sum per currency, never converted, how many reached it and went on, and the win rate; won and lost stages are marked by outcome
 
 ```sh
-amo pipelines show [pipeline]
+amo pipelines show [pipeline] [options]
 ```
 
 | Argument | | What it is |
 |---|---|---|
 | `pipeline` | optional | pipeline:<id>, or a name only one of the CRM's pipelines has; needed unless the CRM has one pipeline in all. |
 
-**Returns:** pipeline — id, ref, name, kind, account, external_id, stages, created_at, and 3 more; every field: amo commands info pipelines show
+| Option | What it does |
+|---|---|
+| `--since-time <time>` | count the rows made at or after this date or time (ISO 8601, or 30d ago). |
+| `--until-time <time>` | count the rows made at or before this date or time; a date alone is that whole day. |
 
-**Example:** `amo work pipelines show pipeline:3`, `amo work pipelines show Sales --json`
+**Returns:** pipeline — id, ref, name, kind, account, external_id, stages, created_at, and 9 more; every field: amo commands info pipelines show
+
+**Example:** `amo work pipelines show pipeline:3`, `amo work pipelines show Sales --since-time 30d --json`
 
 ## `amo stages`
 
@@ -585,7 +590,7 @@ amo stages list [query]
 |---|---|---|
 | `query` | optional | field:value terms that narrow the list — the fields are below. |
 
-**Returns:** stage — name, position, outcome, external_id, open, pipeline, pipeline_name, kind, and 5 more; every field: amo commands info stages list
+**Returns:** stage — name, position, outcome, external_id, open, pipeline, pipeline_name, kind, and 7 more; every field: amo commands info stages list
 
 **Example:** `amo work stages list --json`, `amo work stages list kind:lead`
 
@@ -647,10 +652,12 @@ amo people create [options]
 | `--first-name <name>` | the first name; empty clears it. |
 | `--last-name <name>` | the last name; empty clears it. |
 | `--position <title>` | the job title; empty clears it. |
+| `--email <address>` | an e-mail address to give it; repeat it for more; replaces its list, and an empty one clears it. |
+| `--phone <phone>` | a phone number to give it, in international form starting with +; repeat it for more; replaces its list, and an empty one clears it. |
 | `--owner <user>` | the CRM user it is assigned to; anyone but the sign-in's own user checks crm.assign-others. |
 | `--field <key=value>` | one of the CRM's own fields, by its code or label as `fields list` prints them, and its value; a list field takes its option's label or id; repeat it for more fields, or for each value of a multiple field; an empty value clears it. Default: ``. |
 
-**Returns:** crm record write — operation_id, stored, untrusted, person, organization; every field: amo commands info people create
+**Returns:** crm record write — operation_id, stored, untrusted, removed, person, organization; every field: amo commands info people create
 
 **Example:** `amo work people create --first-name Anna --last-name Example --position Buyer`
 
@@ -674,10 +681,12 @@ amo people update <person> [options]
 | `--first-name <name>` | the first name; empty clears it. |
 | `--last-name <name>` | the last name; empty clears it. |
 | `--position <title>` | the job title; empty clears it. |
+| `--email <address>` | an e-mail address to give it; repeat it for more; replaces its list, and an empty one clears it. |
+| `--phone <phone>` | a phone number to give it, in international form starting with +; repeat it for more; replaces its list, and an empty one clears it. |
 | `--owner <user>` | the CRM user it is assigned to; anyone but the sign-in's own user checks crm.assign-others. |
 | `--field <key=value>` | one of the CRM's own fields, by its code or label as `fields list` prints them, and its value; a list field takes its option's label or id; repeat it for more fields, or for each value of a multiple field; an empty value clears it. Default: ``. |
 
-**Returns:** crm record write — operation_id, stored, untrusted, person, organization; every field: amo commands info people update
+**Returns:** crm record write — operation_id, stored, untrusted, removed, person, organization; every field: amo commands info people update
 
 **Example:** `amo work people update 42 --position Buyer`
 
@@ -725,7 +734,7 @@ amo organizations show <organization>
 
 ### `amo organizations create`
 
-make a organization in the CRM, then store the CRM's copy of it
+make an organization in the CRM, then store the CRM's copy of it
 
 **Changes something in the service.**
 
@@ -736,10 +745,12 @@ amo organizations create [options]
 | Option | What it does |
 |---|---|
 | `--name <name>` | the company's name. |
+| `--email <address>` | an e-mail address to give it; repeat it for more; replaces its list, and an empty one clears it. |
+| `--phone <phone>` | a phone number to give it, in international form starting with +; repeat it for more; replaces its list, and an empty one clears it. |
 | `--owner <user>` | the CRM user it is assigned to; anyone but the sign-in's own user checks crm.assign-others. |
 | `--field <key=value>` | one of the CRM's own fields, by its code or label as `fields list` prints them, and its value; a list field takes its option's label or id; repeat it for more fields, or for each value of a multiple field; an empty value clears it. Default: ``. |
 
-**Returns:** crm record write — operation_id, stored, untrusted, person, organization; every field: amo commands info organizations create
+**Returns:** crm record write — operation_id, stored, untrusted, removed, person, organization; every field: amo commands info organizations create
 
 **Example:** `amo work organizations create --name "Example LLC"`
 
@@ -760,10 +771,12 @@ amo organizations update <organization> [options]
 | Option | What it does |
 |---|---|
 | `--name <name>` | the company's name. |
+| `--email <address>` | an e-mail address to give it; repeat it for more; replaces its list, and an empty one clears it. |
+| `--phone <phone>` | a phone number to give it, in international form starting with +; repeat it for more; replaces its list, and an empty one clears it. |
 | `--owner <user>` | the CRM user it is assigned to; anyone but the sign-in's own user checks crm.assign-others. |
 | `--field <key=value>` | one of the CRM's own fields, by its code or label as `fields list` prints them, and its value; a list field takes its option's label or id; repeat it for more fields, or for each value of a multiple field; an empty value clears it. Default: ``. |
 
-**Returns:** crm record write — operation_id, stored, untrusted, person, organization; every field: amo commands info organizations update
+**Returns:** crm record write — operation_id, stored, untrusted, removed, person, organization; every field: amo commands info organizations update
 
 **Example:** `amo work organizations update 9 --name "Example Ltd"`
 
@@ -1431,6 +1444,56 @@ amo config repair [options]
 | `--dry-run` | say what it would fix, and change nothing. |
 
 **Example:** `amo config repair`, `amo config repair --dry-run`
+
+## `amo setup`
+
+connect this profile to amo: the same questions WireCat Desktop shows, asked in the terminal, checked, and saved only when the check succeeds; show, apply and run are the same flow for programs
+
+### `amo setup show`
+
+print the connection flow as a WireCat setup document: steps, texts in every language, and each setting's own JSON Schema; with a profile it adds the profile's current values, a secret only as { set: true }
+
+```sh
+amo setup show
+```
+
+**Example:** `amo personal setup show --json`, `amo office setup show --json`
+
+### `amo setup apply`
+
+read the answers as one JSON object on stdin (input id → value), keep only those on the path they lead to, check each with its setting's own schema, then run the CLI's check and save the settings and secrets; --dry-run only checks and saves nothing
+
+**Changes something on this computer only.**
+
+```sh
+amo setup apply [options]
+```
+
+| Option | What it does |
+|---|---|
+| `--dry-run` | check the answers, and save nothing. |
+
+**Example:** `amo office setup apply --dry-run --json`, `amo office setup apply --json`
+
+### `amo setup run`
+
+run one run step of the flow: apply checks the answers, runs the CLI's check and saves; the sign-in events go to stderr as JSON lines and the result to stdout; with --answer-stdin the answers are stdin's first line
+
+**Changes something on this computer only.**
+
+```sh
+amo setup run <action> [options]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `action` | required | the step's action: apply. |
+
+| Option | What it does |
+|---|---|
+| `--answer-stdin` | with --json and no terminal: print each question as a `needs` line on stderr and read its answer, one line, from stdin. |
+
+**Example:** `amo office setup run apply --json --answer-stdin`
 
 ## `amo runs`
 

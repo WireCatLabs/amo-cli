@@ -188,6 +188,34 @@ describe("crmWriteContract", () => {
     ])
   })
 
+  it("writes a company's phones and e-mails to its own fields, and refuses them on an account without such a field", async () => {
+    const bare = over()
+    await expect(
+      amoCrmWriter(() => bare.transport, bare.source).update(
+        "organization",
+        "501",
+        { phones: ["+7 900 000-00-09"] },
+        { operationId: "a" },
+      ),
+    ).rejects.toThrow(/no phone field on companies/)
+    const { account, transport, source } = over()
+    const writer = amoCrmWriter(() => transport, source)
+    const [phone, email] = account.data.customFields.contacts ?? []
+    if (!phone || !email) throw new Error("seed")
+    account.data.customFields.companies?.push(phone, email)
+    await writer.update(
+      "organization",
+      "501",
+      { phones: ["+7 900 000-00-09"], emails: ["office@example.test"] },
+      { operationId: "b" },
+    )
+    const company = account.data.companies.find((one) => one.id === 501)
+    expect(company?.custom_fields_values?.map((one) => [one.field_code, one.values.map((v) => v.value)])).toEqual([
+      ["EMAIL", ["office@example.test"]],
+      ["PHONE", ["+7 900 000-00-09"]],
+    ])
+  })
+
   it.each([
     ["lastName", "Sidorov", "Ivan Sidorov"],
     ["firstName", "Pyotr", "Pyotr Petrov"],
