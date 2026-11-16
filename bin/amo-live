@@ -1,0 +1,370 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016 # the single-quoted node programs use JavaScript's own ${…}, never the shell's
+# Runs this checkout's build of `amo` against the owner's live amoCRM account, read-only by default.
+# The long-lived token comes from the keyring and is never printed. Config, state and the store are a throwaway
+# folder: a branch build must not migrate the owner's real store.
+#
+#   bin/amo-live <account> --host https://example.amocrm.ru            # syncs into the throwaway store and reads
+#   bin/amo-live <account> --host https://example.amocrm.ru --write    # also creates one deal "WireCat test …",
+#                           # renames, moves and closes it as lost, syncs again and asks the account that no open
+#                           # test deal is left; when every step passed, appends the version and commit to
+#                           # docs/dev/live-checks.txt, which bin/release checks
+#   AMO_KEYRING_ACCOUNT=<account> AMO_HOST=https://example.amocrm.ru bin/amo-live [--write]
+#   AMO_NONADMIN_ACCOUNT=<account2> …    # also checks a non-administrator's token on the same account
+#
+# <account> is the keyring entry `secret-tool store --label="amo <account>" service amo account <account>` holds the
+# long-lived token in. The address is not in the keyring: give it with --host or AMO_HOST.
+#
+# The token reaches amo on stdin, to `session start --credential-storage file` in the throwaway folder, not as
+# AMO_TOKEN: a sign-in from AMO_TOKEN names no user, so offline reads would show none of the copied deals.
+# The run never sets an owner-only setting, so it passes inside an agent's terminal too.
+set -euo pipefail
+
+write=""
+given=""
+host=${AMO_HOST:-}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --write) write=1 ;;
+    --host) [ $# -ge 2 ] || { echo "--host takes the account's address" >&2; exit 2; }; host=$2; shift ;;
+    --host=*) host=${1#--host=} ;;
+    *) given=$1 ;;
+  esac
+  shift
+done
+account=${given:-${AMO_KEYRING_ACCOUNT:-}}
+usage() {
+  echo "  bin/amo-live <account> --host https://example.amocrm.ru [--write]" >&2
+  echo "  or AMO_KEYRING_ACCOUNT=<account> AMO_HOST=https://example.amocrm.ru bin/amo-live [--write]" >&2
+  exit 2
+}
+[ -n "$account" ] || { echo "name the keyring account that holds the long-lived token (service amo):" >&2; usage; }
+[ -n "$host" ] || { echo "name the account's address with --host or AMO_HOST:" >&2; usage; }
+
+token=$(secret-tool lookup service amo account "$account" 2>/dev/null) || true
+[ -n "$token" ] || {
+  echo "no keyring entry: service amo account $account" >&2
+  echo "store it with: secret-tool store --label=\"amo $account\" service amo account $account" >&2
+  exit 1
+}
+other=""
+if [ -n "${AMO_NONADMIN_ACCOUNT:-}" ]; then
+  other=$(secret-tool lookup service amo account "$AMO_NONADMIN_ACCOUNT" 2>/dev/null) || true
+  [ -n "$other" ] || { echo "no keyring entry: service amo account $AMO_NONADMIN_ACCOUNT" >&2; exit 1; }
+fi
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+# Built here, so the live record names the commit that actually ran.
+(cd "$root" && pnpm -s build >/dev/null)
+
+sandbox=$(mktemp -d)
+# The output and the run records outlive the throwaway folder, so a failed step can be read afterwards; they hold
+# refs, ids, stage names, counts and statuses from the account, never a client's name or the token.
+stamp=$(date +%Y%m%dT%H%M%S)
+logs="${XDG_CACHE_HOME:-$HOME/.cache}/amo-live"
+(umask 077 && mkdir -p "$logs")
+exec > >(umask 077 && tee "$logs/$stamp.log") 2>&1
+echo "log: $logs/$stamp.log"
+trap 'cp -r "$sandbox/data/amo-cli/runs" "$logs/$stamp-runs" 2>/dev/null; rm -rf "$sandbox"' EXIT
+# The profile comes first: `as nonadmin deals list`. Each profile has its own store: a copy holds one user's deals.
+as() {
+  local profile=$1
+  shift
+  env -u AMO_TOKEN -u AMO_HOST -u AMO_PROFILE -u AMO_CONFIG_DIR -u AMO_STATE_DIR -u AMO_READ_ONLY HOME="$sandbox" \
+    XDG_CONFIG_HOME="$sandbox/config" \
+    XDG_DATA_HOME="$sandbox/data" XDG_STATE_HOME="$sandbox/state" XDG_CACHE_HOME="$sandbox/cache" \
+    MESSAGING_STORE="$sandbox/$profile.db" DBUS_SESSION_BUS_ADDRESS=disabled: AMO_NO_UPDATE_CHECK=1 \
+    node "$root/dist/bin/amo.js" "$profile" "$@"
+}
+amo() { as live "$@"; }
+failed=0
+fail() { echo "!! $*"; failed=1; }
+step() { printf '\n== amo live %s\n' "$*"; amo "$@" || fail "exit $?"; }
+# One value out of a JSON answer on stdin, by a dotted path: `item.deal.ref`.
+value() {
+  node -e '
+    let s = ""
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let v
+      try { v = process.argv[1].split(".").reduce((o, k) => o?.[k], JSON.parse(s)) } catch {}
+      console.log(typeof v === "object" && v !== null ? JSON.stringify(v) : (v ?? ""))
+    })' "$1"
+}
+# One API answer in one line: its status and how many records came, or the refusal's code and reason. Never a record.
+# `order` adds whether the records' created_at go up or down, `types` which event types came; `first` prints the first
+# record's <field> alone.
+# A refusal's JSON goes to stderr, among warnings: the last JSON line is the answer.
+api() { { amo api call "$@" --yes --json 2>&1 || true; } | grep '^{"' | tail -n 1 || true; }
+said() {
+  node -e '
+    let s = ""
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let j = {}
+      try { j = JSON.parse(s) } catch {}
+      const [mode, field] = process.argv.slice(1)
+      if (j.error) {
+        if (mode === "first") return console.log("")
+        const e = j.error
+        return console.log(`refused: ${e.code} ${e.reason ?? ""}${e.details?.status ? ` (HTTP ${e.details.status})` : ""}`)
+      }
+      const embedded = Object.values(j.item?.result?._embedded ?? {}).find(Array.isArray) ?? []
+      if (mode === "first") return console.log(embedded[0]?.[field] ?? "")
+      if (mode === "types") {
+        const asked = ["lead_status_changed", "lead_added"]
+        const types = [...new Set(embedded.map((one) => one.type))]
+        const other = types.filter((one) => !asked.includes(one))
+        return console.log(
+          `HTTP ${j.item?.status ?? "?"}, ${embedded.length} record(s) of ${types.join(", ") || "no type"}` +
+            (other.length ? ": other types too" : ""),
+        )
+      }
+      let line = `HTTP ${j.item?.status ?? "?"}, ${embedded.length} record(s)`
+      if (mode === "order") {
+        const at = embedded.map((one) => Number(one.created_at))
+        const up = at.every((t, i) => i === 0 || t >= at[i - 1])
+        const down = at.every((t, i) => i === 0 || t <= at[i - 1])
+        line += at.length < 2 ? ", too few to tell the order" : up && !down ? ", oldest first" : down && !up ? ", newest first" : up ? ", all at one second" : ", in no time order"
+      }
+      console.log(line)
+    })' "$@"
+}
+
+printf '\n== amo live session start --credential-storage file\n'
+printf '%s' "$token" | amo session start --host "$host" --credential-storage file --no-input \
+  --json=state >/dev/null || { echo "!! session start failed"; exit 1; }
+unset token
+step session status --check --json=token_from,account,verified,user.id,user.admin
+me=$(amo session status --check --json 2>/dev/null | value item.user.id)
+[ -n "$me" ] || { echo "!! session status gave no user"; exit 1; }
+step doctor --online --json=version,store
+
+echo "the first sync copies the account into an empty store at amoCRM's pace, seven requests a second: minutes"
+printf '\n== amo live sync\n'
+first=$(amo sync --json=state,synced,issues,scope) || fail "exit $?"
+printf '%s\n' "$first"
+scope=$(printf '%s' "$first" | value item.scope.self):$(printf '%s' "$first" | value item.scope.also)
+[ "$scope" = "$me:[]" ] || fail "with no one chosen the sync must copy the signed-in user $me alone, got $scope"
+# The second sync asks only for what changed since the cursor; every kind must answer it.
+changed() {
+  printf '\n== amo live sync (changes)\n'
+  amo sync --json 2>/dev/null | node -e '
+    let s = ""
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let kinds = []
+      try { kinds = JSON.parse(s).item?.synced ?? [] } catch {}
+      const failed = kinds.filter((one) => one.error)
+      for (const one of kinds) console.log(`${one.kind}: ${one.round} ${one.state}, saved ${one.saved}`)
+      if (!kinds.length || failed.length) process.exit(1)
+    })' || fail "a changes sync failed for some kind"
+}
+changed
+step store status
+step pipelines list --json=ref,name,kind
+step stages list --json=pipeline_name,name,outcome,external_id,open
+step deals list status:open --limit 3 --json=ref,pipeline_name,stage,status,amount,currency
+shown=$(amo deals list --limit 1 --json 2>/dev/null | value items.0.ref)
+if [ -n "$shown" ]; then step deals show "$shown" --json=ref,stage,status,assignee; else
+  echo "no deal in the copy: deals show skipped"
+fi
+step people list --limit 3 --json=id,created_at
+step organizations list --limit 3 --json=id,created_at
+step users list --limit 3 --json=id,active
+step changes list "at>=30d" --limit 5 --json=change,at,kind,ref
+step fields list deals --all --json=code,type,multiple
+
+# A CSV page: a header, then one record per row. Counted, never printed.
+csv() {
+  printf '\n== amo live %s list --format csv --limit 3\n' "$1"
+  amo "$1" list --format csv --limit 3 2>/dev/null | node -e '
+    let s = ""
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      const records = [[]]
+      let cell = "", quoted = false
+      for (let i = 0; i < s.length; i++) {
+        const c = s[i]
+        if (quoted) {
+          if (c === "\"" && s[i + 1] === "\"") { cell += c; i++ } else if (c === "\"") quoted = false; else cell += c
+        } else if (c === "\"") quoted = true
+        else if (c === ",") { records.at(-1).push(cell); cell = "" }
+        else if (c === "\n") { records.at(-1).push(cell.replace(/\r$/, "")); cell = ""; records.push([]) }
+        else cell += c
+      }
+      if (cell || records.at(-1).length) records.at(-1).push(cell); else records.pop()
+      const [header = [], ...rows] = records
+      const even = rows.every((row) => row.length === header.length)
+      const keyed = ["id", "ref"].some((name) => header.includes(name))
+      if (quoted || !keyed || rows.length > 3 || !even) process.exit(1)
+      console.log(`ok: a header of ${header.length} columns, then ${rows.length} rows of as many cells`)
+    })' || fail "$1 list --format csv is not a CSV table with a header"
+}
+csv deals
+csv people
+
+# Search finds a stored deal by a word of its own title. Only the count is printed.
+printf '\n== amo live search all\n'
+word=$(amo deals list --limit 1 --json 2>/dev/null | value items.0.title | awk '{ print $1 }')
+if [ -n "$word" ]; then
+  hits=$(amo search all "$word" --only crm --limit 5 --json 2>/dev/null | value items.length)
+  if [ "${hits:-0}" -ge 1 ]; then echo "ok: a word of a stored deal's title finds $hits hit(s)"; else
+    fail "search found no stored deal by a word of its own title"
+  fi
+else echo "no deal in the copy: search skipped"; fi
+
+# The questions docs/dev/DESIGN.md "Live checks" asks of a real account. Observations: each is one plain line in the
+# log, and fails the run only where a wrong answer breaks the sync.
+printf '\n== live questions\n'
+filters=$(api "GET /api/v4/account" --params '{"with":"is_api_filter_enabled"}' | value item.result.is_api_filter_enabled)
+echo "account is_api_filter_enabled: ${filters:-not answered}"
+# A window in 1970 holds nothing: records in it mean the account ignores the filter.
+for list in leads tasks leads/notes; do
+  echo "GET /api/v4/$list, no filter: $(api "GET /api/v4/$list" --params '{"limit":5}' | said count)"
+  answer=$(api "GET /api/v4/$list" --params '{"limit":5,"filter[updated_at][from]":1,"filter[updated_at][to]":2}')
+  echo "GET /api/v4/$list, filter[updated_at] in 1970: $(printf '%s' "$answer" | said count)"
+  if [ "$list" = leads ] && [ "$filters" = true ] && printf '%s' "$answer" | said count | grep -qv ' 0 record'; then
+    fail "the account says it filters, yet leads updated in 1970 came back: the changes sync would copy everything"
+  fi
+  at=$(api "GET /api/v4/$list" --params '{"limit":1}' | said first updated_at)
+  if [ -n "$at" ]; then
+    echo "GET /api/v4/$list, filter[updated_at] from=to=its own second: $(api "GET /api/v4/$list" \
+      --params "{\"limit\":5,\"filter[updated_at][from]\":$at,\"filter[updated_at][to]\":$at}" | said count)"
+  fi
+done
+# Two types asked in each form: other types back mean the form is ignored, none means it is misread.
+pair='"lead_status_changed","lead_added"'
+echo "events filter[type][]=[$pair]: $(api "GET /api/v4/events" \
+  --params "{\"limit\":100,\"filter[type][]\":[$pair]}" | said types)"
+echo "events filter[type]=\"lead_status_changed,lead_added\": $(api "GET /api/v4/events" \
+  --params '{"limit":100,"filter[type]":"lead_status_changed,lead_added"}' | said types)"
+echo "events order, filter[type][]=lead_status_changed: $(api "GET /api/v4/events" \
+  --params '{"limit":10,"filter[type][]":["lead_status_changed"]}' | said order)"
+# The form the sync sends to this host must narrow the list: the sync reads every *_deleted answer as a deletion.
+typed() {
+  case "$host" in
+    *.amocrm.ru*) printf '{"limit":%s,"filter[type][]":[%s]}' "$1" "$2" ;;
+    *) printf '{"limit":%s,"filter[type]":"%s"}' "$1" "$(printf '%s' "$2" | tr -d '"')" ;;
+  esac
+}
+sent=$(api "GET /api/v4/events" --params "$(typed 100 "$pair")" | said types)
+echo "events, the form the sync sends to this host: $sent"
+case "$sent" in
+  refused* | *"other types"*) fail "the events form the sync sends to this host does not narrow the list by type" ;;
+esac
+gone=$(api "GET /api/v4/events" --params "$(typed 1 '"lead_deleted"')" | said first entity_id)
+if [ -n "$gone" ]; then
+  echo "by-id read of deleted lead $gone: $(api "GET /api/v4/leads/$gone" | node -e '
+    let s = ""
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      let j = {}
+      try { j = JSON.parse(s) } catch {}
+      if (j.error) return console.log(`refused: ${j.error.code} ${j.error.reason ?? ""} (HTTP ${j.error.details?.status ?? "?"})`)
+      const r = j.item?.result
+      console.log(`HTTP ${j.item?.status}, ${r ? `a record, is_deleted ${JSON.stringify(r.is_deleted ?? null)}` : "no body"}`)
+    })')"
+else
+  echo "no lead_deleted event: delete one test deal in amoCRM by hand, then run again to see a deleted lead's read"
+fi
+
+if [ -n "$other" ]; then
+  # A second profile on the same account: its copy, read offline, must hold only its own deals (SEC-197).
+  printf '\n== amo nonadmin session start --credential-storage file\n'
+  if printf '%s' "$other" | as nonadmin session start --host "$host" --credential-storage file --no-input \
+    --json=state,account,user.id,user.admin; then
+    them=$(as nonadmin session status --check --json 2>/dev/null | value item.user.id)
+    admin=$(as nonadmin session status --check --json 2>/dev/null | value item.user.admin)
+    echo "non-administrator: user $them, admin ${admin:-not known}"
+    [ "$admin" != true ] || fail "AMO_NONADMIN_ACCOUNT's token is an administrator's: no non-administrator was checked"
+    printf '\n== amo nonadmin sync\n'
+    as nonadmin sync --json=state,scope >/dev/null || fail "non-administrator sync: exit $?"
+    printf '\n== amo nonadmin deals list (offline)\n'
+    as nonadmin deals list --limit 500 --offline --json 2>/dev/null | node -e '
+      let s = ""
+      process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        let items = []
+        try { items = JSON.parse(s).items ?? [] } catch { process.exit(1) }
+        const own = `/user/${process.argv[1]}`
+        const foreign = items.filter((one) => !String(one.assignee ?? "").endsWith(own))
+        console.log(`${items.length} deal(s) read offline, ${foreign.length} of another user`)
+        if (foreign.length) process.exit(1)
+      })' "$them" || fail "the non-administrator read another user's deals offline"
+    printf '\n== amo nonadmin users show %s\n' "$me"
+    shown=$({ as nonadmin users show "$me" --json 2>&1 || true; } | grep '^{"' | tail -n 1 || true)
+    printf '%s' "$shown" | node -e '
+        let s = ""
+        process.stdin.on("data", (d) => (s += d)).on("end", () => {
+          let j = {}
+          try { j = JSON.parse(s) } catch {}
+          if (j.item) return console.log("answered: amoCRM let a non-administrator read a user")
+          if (!j.error?.code) process.exit(1)
+          console.log(`handled: ${j.error.code} ${j.error.reason ?? ""}`)
+        })' || fail "users show as a non-administrator gave no error envelope"
+    echo "non-administrator tasks: $(as nonadmin api call "GET /api/v4/tasks" --params '{"limit":250}' --yes --json \
+      2>/dev/null | said count), administrator's: $(api "GET /api/v4/tasks" --params '{"limit":250}' | said count)"
+  else
+    fail "the non-administrator's session start was refused: the answer above is DESIGN.md's open question"
+  fi
+  unset other
+fi
+
+if [ -z "$write" ]; then
+  [ "$failed" = 0 ] || exit 1
+  echo "read-only run passed; the release record needs bin/amo-live --write"
+  exit 0
+fi
+
+title="WireCat test $(date +%Y-%m-%dT%H:%M)"
+# A deal in the first deal pipeline: created, renamed, moved to another open stage, closed lost with a reason.
+stages=$(amo stages list kind:deal --json)
+pipeline=$(printf '%s' "$stages" | value items.0.pipeline)
+printf '\n== amo live deals create\n'
+deal=$(amo deals create --title "$title" --pipeline "$pipeline" --json | value item.deal.ref)
+[ -n "$deal" ] || { echo "!! deals create gave no ref"; exit 1; }
+echo "created $deal: $title"
+step deals show "$deal" --json=ref,title,stage,status,assignee
+step deals update "$deal" --title "$title (renamed)" --json=operation_id,deal.title
+# Not the first stage: amoCRM keeps it for unsorted requests, and a new deal lands in the next one.
+at=$(amo deals show "$deal" --json 2>/dev/null | value item.stage)
+next=$(printf '%s' "$stages" | node -e '
+  let s = ""
+  process.stdin.on("data", (d) => (s += d)).on("end", () => {
+    const items = JSON.parse(s).items ?? []
+    const open = items.filter((one) => one.pipeline === items[0]?.pipeline && one.outcome === "open")
+    console.log(open.slice(1).find((one) => one.name !== process.argv[1])?.external_id ?? "")
+  })' "$at")
+if [ -n "$next" ]; then
+  step deals move "$deal" "$next" --json=deal.stage,deal.status
+  moved=$(amo deals show "$deal" --json 2>/dev/null | value item.stage)
+  [ "$moved" != "$at" ] || fail "deals move left $deal in its stage"
+else echo "no other open stage: no move"; fi
+reason=$(api "GET /api/v4/leads/loss_reasons" | said first name)
+if [ -n "$reason" ]; then step deals close "$deal" lost --reason "$reason" --json=deal.status,deal.closed_reason; else
+  echo "the account has no loss reason: closed lost without one"
+  step deals close "$deal" lost --json=deal.status
+fi
+echo "amoCRM's API v4 has no lead delete: $deal stays in the account, closed as lost"
+
+changed
+status=$(amo deals show "$deal" --offline --json 2>/dev/null | value item.status)
+[ "$status" = lost ] || fail "after the sync the store holds $deal as '$status', not lost"
+# Asked of the account itself: this run's deal by its id, then every test deal its search finds, an earlier run's too.
+printf '\n== open test deals in the account\n'
+lead=$(amo deals show "$deal" --offline --json 2>/dev/null | value item.external_id)
+closed=$(api "GET /api/v4/leads/$lead" | value item.result.status_id)
+case "$closed" in
+  142 | 143) echo "ok: lead $lead is closed in the account (status $closed)" ;;
+  *) fail "lead $lead is not closed in the account (status '$closed')" ;;
+esac
+api "GET /api/v4/leads" --params '{"limit":250,"query":"WireCat test"}' | node -e '
+  let s = ""
+  process.stdin.on("data", (d) => (s += d)).on("end", () => {
+    let j = {}
+    try { j = JSON.parse(s) } catch {}
+    if (j.error) { console.log(`refused: ${j.error.code} ${j.error.reason ?? ""}`); process.exit(1) }
+    const leads = (j.item?.result?._embedded?.leads ?? []).filter((one) => String(one.name).startsWith("WireCat test"))
+    const open = leads.filter((one) => one.status_id !== 142 && one.status_id !== 143)
+    console.log(`search: ${leads.length} test deal(s), ${open.length} open${open.length ? `: ${open.map((one) => one.id).join(", ")}` : ""}`)
+    if (open.length) process.exit(1)
+  })' || fail "the account has an open test deal"
+
+[ "$failed" = 0 ] || { echo "a step failed: no live record" >&2; exit 1; }
+(cd "$root" && pnpm exec cli-dev live record --script bin/amo-live)
+echo "every step passed: commit docs/dev/live-checks.txt in the release pull request"
