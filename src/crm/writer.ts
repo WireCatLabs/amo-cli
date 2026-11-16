@@ -103,6 +103,18 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
     return fields
   }
 
+  /**
+   * A contact made through the API or a web form may hold only `name`. It is split in the order `fullName` joins the
+   * parts, so a contact renamed by one part keeps the other.
+   */
+  const partsOf = (
+    current: { name?: string | null; firstName?: string | null; lastName?: string | null } | null | undefined,
+  ) => {
+    if (current?.firstName || current?.lastName) return { first: current.firstName, last: current.lastName }
+    const [first, ...rest] = (current?.name ?? "").trim().split(/\s+/)
+    return { first: first || undefined, last: rest.join(" ") || undefined }
+  }
+
   /** On update the contact as amoCRM holds it now: the name part not given, and the kinds of the numbers kept. */
   const personOf = async (given: CrmPersonFields, externalId?: string): Promise<Raw> => {
     refuseStandard(given.custom)
@@ -115,12 +127,13 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
         ? await source.get?.("person", externalId)
         : undefined
     const fields: Raw = {}
+    const stored = partsOf(current)
     const name =
       given.name ??
       (naming
         ? crmValues.fullName(
-            given.firstName === undefined ? current?.firstName : given.firstName,
-            given.lastName === undefined ? current?.lastName : given.lastName,
+            given.firstName === undefined ? stored.first : given.firstName,
+            given.lastName === undefined ? stored.last : given.lastName,
           )
         : undefined)
     if (name != null) fields.name = name

@@ -69,7 +69,7 @@ const removal: AccountRemoval = {
 /** The store keeps one copy per account host, so deleting one profile's data deletes every profile's on that host. */
 const refuseSharedDelete = (command: Command) => {
   if (command.opts().deleteData !== true) return
-  const { env, keyring, profile } = contextOf(command)
+  const { env, keyring, profile, renderer } = contextOf(command)
   const own = hostOf(env, keyring, profile)
   if (!own) return
   // biome-ignore lint/plugin/no-own-settings: this check reads every profile, and baseContext names one
@@ -79,6 +79,11 @@ const refuseSharedDelete = (command: Command) => {
   )
   if (sharing.length === 0) return
   const names = sharing.join(", ")
+  // A dry run lists what --delete-data would delete, and says the real run refuses.
+  if (command.opts().dryRun === true) {
+    renderer.warn(`without --dry-run this refuses: ${names} also read${sharing.length === 1 ? "s" : ""} ${own}`)
+    return
+  }
   throw new CliError(
     "conflict",
     `${names} also read${sharing.length === 1 ? "s" : ""} ${own}, and the store keeps one copy of an account: ` +

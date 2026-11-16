@@ -25,6 +25,8 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 - `session start --client-id <id>` signs in through your own private integration with OAuth, and renews the access
   token itself. The integration's Redirect URI is `https://wirecat.dev/webhooks/apps/amo-callback`.
 - `account remove` forgets a profile's sign-in and files; `--delete-data` also deletes the account's copy, and refuses
-  while another profile reads the same account.
+  while another profile reads the same account (`--dry-run` lists it all and warns).
 - `schedule` runs `sync` on a timer.
 - `sync` resumes inside a page when a run's request budget ends, and reads clients only by the ids its deals name.
+  A contact given to a colleague or taken off your deals loses its phones and e-mails in the copy, and leaves it at
+  the next `sync --rescan`.

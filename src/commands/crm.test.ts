@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { FAKE_COLLEAGUE_ID, type FakeAmo, type FakeAmoOptions, fakeAmo } from "../testing/fake-amo.js"
+import { openAmoStore } from "../store.js"
+import { FAKE_COLLEAGUE_ID, FAKE_HOST, type FakeAmo, type FakeAmoOptions, fakeAmo } from "../testing/fake-amo.js"
 import { amo } from "../testing/harness.js"
 
 const account = (options: FakeAmoOptions = {}) => fakeAmo({ perSecond: 10_000, ...options })
@@ -31,6 +32,15 @@ const grown = (fake: FakeAmo, count: number) => {
   for (let at = 0; at < count; at++) {
     fake.data.contacts.push({ ...contact, id: 1000 + at, name: `Extra ${at}`, companies: [] })
     fake.data.leads.push({ ...lead, id: 2000 + at, name: `Extra lead ${at}`, contacts: [1000 + at], companies: [] })
+  }
+}
+
+const people = async () => {
+  const store = await openAmoStore(process.env)
+  try {
+    return await store.crm.count({ provider: "amocrm", account: FAKE_HOST }, "person")
+  } finally {
+    await store.close()
   }
 }
 
@@ -228,4 +238,43 @@ describe("sync in small runs", () => {
     },
     60_000,
   )
+
+  it("finishes a changed colleague's company on more old deals than a run of 20 requests reads", async () => {
+    const fake = account({ apiFilter: false })
+    const [lead] = fake.data.leads
+    if (!lead) throw new Error("seed")
+    for (let at = 0; at < 30; at++)
+      fake.data.leads.push({
+        ...lead,
+        id: 3000 + at,
+        responsible_user_id: FAKE_COLLEAGUE_ID,
+        contacts: [],
+        companies: [502],
+      })
+    await sync(fake)
+    const company = fake.data.companies.find((one) => one.id === 502)
+    if (!company) throw new Error("seed")
+    company.updated_at = Math.floor(Date.now() / 1000) + 5
+    let state = ""
+    let runs = 0
+    for (; runs < 10 && state !== "complete"; runs++) {
+      const ran = await amo(["work", "sync", "--max-pages", "20", "--json"], { account: fake })
+      if (!ran.out) throw new Error(`${ran.code} ${ran.err.slice(-600)}`)
+      state = String((ran.json().item as { state?: string }).state)
+    }
+    expect(state).toBe("complete")
+  }, 60_000)
+
+  it("drops a contact given to a colleague and off every chosen deal at the next rescan", async () => {
+    const fake = account()
+    await sync(fake)
+    const before = await people()
+    const contact = fake.data.contacts.find((one) => one.id === 402)
+    if (!contact) throw new Error("seed")
+    for (const one of fake.data.leads) one.contacts = one.contacts.filter((id) => id !== 402)
+    Object.assign(contact, { responsible_user_id: FAKE_COLLEAGUE_ID, updated_at: Math.floor(Date.now() / 1000) + 5 })
+    await sync(fake)
+    expect((await amo(["work", "sync", "--rescan", "--json"], { account: fake })).code).toBe(0)
+    expect(await people()).toBe(before - 1)
+  })
 })
