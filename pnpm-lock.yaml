@@ -13,11 +13,11 @@ importers:
   .:
     dependencies:
       '@wirecat/cli-base':
-        specifier: 0.98.0
-        version: 0.98.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5)
+        specifier: 0.99.0
+        version: 0.99.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5)
       '@wirecat/cli-core':
-        specifier: 0.650.0
-        version: 0.650.0(@wirecat/cli-base@0.98.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5))(commander@15.0.0)(typescript@7.0.2)(zod@4.6.7)
+        specifier: 0.658.0
+        version: 0.658.0(@wirecat/cli-base@0.99.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5))(commander@15.0.0)(typescript@7.0.2)(zod@4.6.7)
       commander:
         specifier: 15.0.0
         version: 15.0.0
@@ -44,8 +44,8 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
       '@wirecat/cli-testing':
-        specifier: 0.7.0
-        version: 0.7.0
+        specifier: 0.7.1
+        version: 0.7.1
       cspell:
         specifier: 10.4.0
         version: 10.4.0
@@ -1179,8 +1179,8 @@ packages:
   '@wasm-audio-decoders/opus-ml@0.0.3':
     resolution: {integrity: sha512-SEeTmk0eb3q5etJA/NHCRWW6BivTx9tqvNTmG0kg2ynuATEQRUZnwQE6Ibvl1BBvqIGHqI57+qyJMWmJBwb5XQ==}
 
-  '@wirecat/cli-base@0.98.0':
-    resolution: {integrity: sha512-nDb+rCsKf2W/KbLLosxicOwfXYGVmdJzunILKSPqjna1eSxwFBUS+2GXhStIK+UfqbxmpnVQmFX4MZAIOi6zzg==}
+  '@wirecat/cli-base@0.99.0':
+    resolution: {integrity: sha512-S0uEsCij5Q5YmUFrZcFjPy9VrJJ25nLm3TShqWXFgM4tmNKTKfBCbckBLvsNTch+Ko/mOWG7p4vcRJ6ZW7Ej5w==}
     engines: {node: '>=22'}
     hasBin: true
     peerDependencies:
@@ -1201,8 +1201,8 @@ packages:
   '@wirecat/cli-core-sqlite@1.1.0':
     resolution: {integrity: sha512-GpGlh/dAIX/nblBYCdT6DfWSLFxav9mxxeELQAfEuw+QZdT9unKxbi5xa02s/s4JS1P7n0PQx2sCABj4FlMRNw==}
 
-  '@wirecat/cli-core@0.650.0':
-    resolution: {integrity: sha512-8HVS7AkvIRD7ZmZS+wyVNS8+EnMjTdTNIdrBBuw9ZKYXHsBAR3sSIc7oQaBI0GRt78vAYyWxDilT1G3aVYN5lg==}
+  '@wirecat/cli-core@0.658.0':
+    resolution: {integrity: sha512-jKwoxzXTxd8R61Kv1MiRM/iEZ+G6BZbMBZfUFbQbZCxUdexgHT2MMXzJlZ7wLyaYwmYleXt/tiF+G2aMm2Wu8A==}
     engines: {node: ^22.16.0 || >=24}
     hasBin: true
     peerDependencies:
@@ -1216,8 +1216,8 @@ packages:
       ssh2:
         optional: true
 
-  '@wirecat/cli-testing@0.7.0':
-    resolution: {integrity: sha512-1FTDRQOM6g6Z9lTA5dOBk+s8XNcfJUt33yKjZV8g4trCZbKrqWh2jvdhVLvgM8xAzh/61HqSWyCvbbVpegbO+Q==}
+  '@wirecat/cli-testing@0.7.1':
+    resolution: {integrity: sha512-dY07B79jpp1Ns19TeSgjLlGR4MQ5ZCO6p7DCPonXLyR61cVm+WRPw0WON6iSUw1hzJrKmkE1jUqUuxIbbFF1OQ==}
     engines: {node: ^22.16.0 || >=24}
     hasBin: true
 
@@ -2076,8 +2076,8 @@ packages:
     resolution: {integrity: sha512-+6Qsn7Q2TSLMScfN4X2VQIclPRKgDAtKhytQex3fVSV/+HgVaawtsQGzKYDQLQIBR7b4Vfg+88WRGvuF/kwLSw==}
     engines: {node: '>=20'}
 
-  postcss@8.5.33:
-    resolution: {integrity: sha512-RVHEU9/Pp1Fnjr/MpAJsZoADukCKhfIi15OunEYiGktIkYLkPVvC1sioWolGDS7XByMTx9m/IGbro0Js13zhnQ==}
+  postcss@8.5.32:
+    resolution: {integrity: sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==}
     engines: {node: ^10 || ^12 || >=14}
 
   process-nextick-args@2.0.1:
@@ -3219,7 +3219,7 @@ snapshots:
     dependencies:
       '@wasm-audio-decoders/common': 9.0.7
 
-  '@wirecat/cli-base@0.98.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5)':
+  '@wirecat/cli-base@0.99.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5)':
     dependencies:
       '@valibot/to-json-schema': 1.8.0(valibot@1.5.0(typescript@7.0.2))
       cli-table3: 0.6.5
@@ -3239,7 +3239,7 @@ snapshots:
 
   '@wirecat/cli-core-sqlite@1.1.0': {}
 
-  '@wirecat/cli-core@0.650.0(@wirecat/cli-base@0.98.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5))(commander@15.0.0)(typescript@7.0.2)(zod@4.6.7)':
+  '@wirecat/cli-core@0.658.0(@wirecat/cli-base@0.99.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5))(commander@15.0.0)(typescript@7.0.2)(zod@4.6.7)':
     dependencies:
       '@anthropic-ai/sdk': 1.3.0(zod@4.6.7)
       '@bomb.sh/tab': 0.0.22(commander@15.0.0)
@@ -3249,7 +3249,7 @@ snapshots:
       '@valibot/to-json-schema': 1.8.0(valibot@1.5.0(typescript@7.0.2))
       '@wasm-audio-decoders/flac': 0.2.11
       '@wasm-audio-decoders/ogg-vorbis': 0.1.20
-      '@wirecat/cli-base': 0.98.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5)
+      '@wirecat/cli-base': 0.99.0(commander@15.0.0)(esbuild@0.28.2)(typescript@7.0.2)(vitest@5.0.5)
       '@wirecat/cli-core-onnx': 1.2.0
       '@wirecat/cli-core-sqlite': 1.1.0
       '@xmldom/xmldom': 0.9.12
@@ -3292,7 +3292,7 @@ snapshots:
       - typescript
       - zod
 
-  '@wirecat/cli-testing@0.7.0':
+  '@wirecat/cli-testing@0.7.1':
     dependencies:
       '@modelcontextprotocol/client': 2.4.0
 
@@ -4344,7 +4344,7 @@ snapshots:
 
   postal-mime@4.1.4: {}
 
-  postcss@8.5.33:
+  postcss@8.5.32:
     dependencies:
       nanoid: 3.3.20
       picocolors: 1.1.1
@@ -4576,7 +4576,7 @@ snapshots:
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
-      postcss: 8.5.33
+      postcss: 8.5.32
       rolldown: 1.2.19
       tinyglobby: 0.2.17
     optionalDependencies:
