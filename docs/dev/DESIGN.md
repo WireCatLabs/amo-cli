@@ -303,6 +303,9 @@ the main pipeline").
   and user, and `<host>:<user>`), which [cli-core#3005](https://github.com/WireCatLabs/cli-core/pull/3005) honours.
   Mount `setupCommand(amoSetup)` in `program.ts` at the bump that carries it, with an apply → `session status
   --check` round-trip test and `cli-dev lint` over the setup group. No image blocks until the screenshots exist.
+- `session start` does not write the `host` setting: editing a terminal-made profile in Desktop starts with an empty
+  address, and a profile moved with `session start` keeps a stale `host` that makes an edit without a token fail with
+  `account.token-missing`. One `changeSetting` in `session start`, with the mount.
 - Desktop shows links only to wirecat.dev, github.com/WireCatLabs and the catalog entry's domains: amoCRM's guide
   links in the setup texts are plain text unless amo's catalog entry lists amocrm.ru.
 - The checkbox «Доступ к данным аккаунта» comes from the README; amoCRM's step-by-step page names only the group
