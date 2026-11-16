@@ -14,6 +14,8 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
   fields or refuse when the account has none, and `pipelines show --since-time|--until-time` answer a period funnel.
 - On cli-core 0.681.0 and cli-base 0.106.0: `setup apply --dry-run` never opens the keyring, and a skill's parts are
   served beside it.
+- On cli-core 0.683.0: `changes list` and the digest work on Node 22.16, a note shows once in `changes list`, and
+  `config set crm.amocrm:<host>.self` is refused (only a signed-in sync sets the copy's user).
 - With `config set crm.amocrm:<host>.activities on`, `sync` copies the tasks, comments and calls on your deals and
   their clients (90 days back at first); `activities list` lists them, `changes list` shows what changed, and
   `schedule command crm-digest --at 08:30 -- changes list --format report` sends a morning digest. A task deleted in
