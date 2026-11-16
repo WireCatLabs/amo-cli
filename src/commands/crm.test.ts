@@ -364,6 +364,30 @@ describe("activities, changes and the digest", () => {
     expect(text).not.toMatch(/Colleague's|000-00-01|record\.mp3/)
   })
 
+  it("lets go of a task deleted in amoCRM at the next sync", async () => {
+    const fake = account()
+    await activitiesOn(fake)
+    await sync(fake)
+    expect(idsOf(await listed(fake, ["activities", "list"]))).toContain("task:601")
+    fake.data.tasks.splice(
+      fake.data.tasks.findIndex((one) => one.id === 601),
+      1,
+    )
+    const [first] = fake.data.events
+    if (!first) throw new Error("seed")
+    const at = Math.floor(Date.now() / 1000)
+    fake.data.events.push({
+      ...first,
+      id: "01fakeevent0601",
+      type: "task_deleted",
+      entity_id: 601,
+      entity_type: "task",
+      created_at: at,
+    })
+    await sync(fake)
+    expect(idsOf(await listed(fake, ["activities", "list"]))).not.toContain("task:601")
+  })
+
   it("prints the digest report with an overdue task, and no note text, phone or e-mail", async () => {
     const fake = account()
     const [task] = fake.data.tasks

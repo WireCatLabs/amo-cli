@@ -632,7 +632,7 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       const caller = metered(context)
       return readActivities(
         (route, name, query) => listPage(caller, route, name, query),
-        { since, now: now(), size, ...(page === undefined ? {} : { page }) },
+        { since, now: now(), size, types: typesOf, ...(page === undefined ? {} : { page }) },
         context,
       )
     },

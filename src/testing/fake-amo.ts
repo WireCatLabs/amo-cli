@@ -714,16 +714,18 @@ const handlersFor = (data: Data, options: FakeAmoOptions, now: () => number): Re
       ),
     "GET /api/v4/leads/loss_reasons": () =>
       hal({ _total_items: data.lossReasons.length, _embedded: { loss_reasons: data.lossReasons } }),
-    // Kommo events-list: `filter[type]` and `filter[entity]` are comma lists, `filter[created_at][from]` a time.
+    // Kommo events-list: `filter[type]` and `filter[entity]` are comma lists, `filter[created_at][from]` and `[to]` times, both taken as inclusive.
     "GET /api/v4/events": (call) => {
       const types = valuesOf(call, "filter[type]")
       const entities = valuesOf(call, "filter[entity]")
       const from = Number(call.query["filter[created_at][from]"]?.[0] ?? 0)
+      const to = Number(call.query["filter[created_at][to]"]?.[0] ?? Number.MAX_SAFE_INTEGER)
       const all = data.events.filter(
         (one) =>
           (!types.length || types.includes(one.type)) &&
           (!entities.length || entities.includes(one.entity_type)) &&
-          one.created_at >= from,
+          one.created_at >= from &&
+          one.created_at <= to,
       )
       return page(call, "events", all, href("/api/v4/events"))
     },

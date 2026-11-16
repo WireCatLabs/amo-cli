@@ -205,10 +205,18 @@ Languages: ru, en.
   is on, which it is not by default (NEED-P3-4). A round reads `GET /api/v4/tasks`, then the notes of leads, contacts
   and companies (`GET /api/v4/{entity_type}/notes`), each changed from 10 minutes before the last round's start to this
   round's start, 90 days back at first.
-  - Each request reads a window of `updated_at` seconds whole on one page: one that holds more than a page is halved
-    and read again, one that fits moves on and doubles. A row deleted or changed between runs cannot shift an unread
-    row past the cursor, as page numbers would, so a cut round never skips; it may repeat. Only a single second with
-    more rows than a page is paged. The cursor is `<list><from>.<width>.<page>@<round start>`.
+  - Each call reads one window of `updated_at` seconds on one page, sent one second wider at both ends, since amoCRM
+    does not say whether `[from]` and `[to]` take their own second. A window that holds more than a page is halved and
+    read again; one that fits moves on, sized from the rows it held to about 85 % of a page (5 000 notes over 89 days:
+    at most 32 requests, 20 pages at best). The cursor is `<phase><from>.<width>.<page>@<round start>`.
+  - A window is never paged by number across calls, so a row deleted or changed between two runs cannot move an
+    unread row past the cursor. Tested: a row deleted between runs inside a busy second hides no other, and both
+    bounds leaving out their own second lose no row. A single second that holds more than a page is read whole in one
+    call, 250 rows a page; a budget stop inside it keeps the cursor at the second's start, so the next run repeats it.
+    A cursor no phase reads starts the round again.
+  - Then the `task_deleted` events created in the round's window (events-and-notes, the table of event types): each
+    names its task on nothing, and cli-core lets go of the copy's one. Events never change once written, so their
+    pages keep their place.
   - Both lists are read for the whole account, since neither filters by a lead's owner; cli-core keeps only those on
     the deals, contacts and companies the copy holds, so a colleague's are never stored.
   - A task's type 1 is a call and 2 a meeting ([tasks-api](https://www.amocrm.ru/developers/content/crm_platform/tasks-api));
@@ -216,7 +224,8 @@ Languages: ru, en.
     `call_out` note keeps only its direction, never `params` (the client's phone, a recording link,
     [notes-types](https://developers.kommo.com/reference/notes-types)). SMS, service messages, attachments and
     geolocation are left out.
-  - A list the account refuses is a gap; the others are still read. `api call` keeps notes `ask` and the
+  - A list the account refuses, for the sign-in's rights or for its `updated_at` filter, is a gap; the others are
+    still read. `api call` keeps notes `ask` and the
     administrator's only: the sync reads them because the owner turned activities on.
 - `activities list`, `changes list` and `changes list --format report` are cli-core's, over the copy, with the offline
   viewer rule; `schedule command crm-digest --at 08:30 -- changes list --format report` is the morning digest.
@@ -271,8 +280,9 @@ phone and a recording link, a service message, and some on a colleague's lead an
 `/oauth2/access_token` (a code once, a rotating refresh token), writes to all three entities, and `apiFilter: false`,
 which refuses `filter[…]` on the lead, contact and company lists.
 
-Two of its answers are assumptions, not documented behaviour: the refusal without the add-on (on the lead,
-contact and company lists only: tasks and notes document their own filters, research §6), and a lead sent with a
+Three of its answers are assumptions, not documented behaviour: the refusal without the add-on (on the lead,
+contact and company lists only: tasks and notes document their own filters, research §6), `updated_at` and
+`created_at` bounds that take their own second, and a lead sent with a
 pipeline but no stage landing in that pipeline's first regular stage (leads-api documents only "the first stage of
 the main pipeline").
 
@@ -314,9 +324,15 @@ the main pipeline").
   (`user` in `openProfile`, `src/commands/crm-shared.ts`, read from the saved sign-in with no network; `null` for
   `AMO_TOKEN`), so a non-administrator's profile reads offline only its own user's deals, and `search all` finds none
   of the rest (cli-core 0.676.0; test "a colleague's profile on the same account").
+- Tasks and notes: a change landing in the milliseconds between two page reads of one busy second can still move a
+  row past the read; a second with more pages than one run's whole budget never finishes. A deleted note stays in
+  the copy (no note deletion is read). A note arrives done, so cli-core lists it in `changes list` both as added and
+  as done; b24's comments do the same, and only cli-core can list an undated activity that arrives done once.
 - Live checks:
-  - `filter[updated_at][from]` and `[to]` on tasks and notes of an account without the add-on, and whether `[to]` is
-    inclusive;
+  - `filter[updated_at][from]` and `[to]` on tasks and notes of an account without the add-on, and whether each takes
+    its own second (the windows are sent a second wider, so the answer no longer decides correctness);
+  - whether amoCRM shows a non-administrator's token its colleagues' tasks and notes, and a `task_deleted` event with
+    the task's id in `entity_id`;
   - the `filter[type]` form on a `.amocrm.ru` account;
   - one `GET /api/v4/events?filter[type][]=lead_status_changed`, to see whether events come newest or oldest first;
   - one by-id read of a deleted lead: 204, or a record with `is_deleted`;
