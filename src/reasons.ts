@@ -10,6 +10,7 @@ const CORE = new Set(CORE_REASONS.map((one) => one.reason))
  */
 const OWN: [reason: string, code: string, message: string][] = [
   ["account.malformed", "validation_error", "that is not an amoCRM or Kommo account address"],
+  ["account.token-missing", "validation_error", "a profile moved to another account needs that account's token"],
   ["account.host-missing", "configuration_error", "AMO_TOKEN needs AMO_HOST, the account's address"],
   ["session.expired", "authentication_error", "amoCRM refused the token: it expired or was revoked"],
   ["session.duplicate", "conflict", "another profile here already signs in to this account as this user"],

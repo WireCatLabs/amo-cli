@@ -84,6 +84,21 @@ const refuseDuplicate = (
   )
 }
 
+/**
+ * A long-lived token proven against its account, and what a profile keeps for it: the sign-in with the address and
+ * the token's user, and the account as `session start` remembers it. `setup apply` runs the same check.
+ */
+export const checkedToken = async (command: Command, origin: string, token: string) => {
+  const { env, profile, keyring, run } = contextOf(command)
+  const who = await run((events) => accountUser(transportFor(command, { origin, token }, events)))
+  refuseDuplicate(env, keyring, profile, { host: who.account, userId: who.user.id })
+  return {
+    who,
+    signIn: encodeSignIn({ origin, token, userId: who.user.id }),
+    account: `${who.account}:${who.user.id}`,
+  }
+}
+
 const PASTE = "If the browser did not come back here, paste the address it ended on: "
 
 interface StartArgs {
@@ -206,7 +221,7 @@ const startCommand = () =>
       "keyring" as TokenStorage,
     )
     .action(async function (this: Command, args: StartArgs) {
-      const { env, profile, tokens, run, keyring } = contextOf(this)
+      const { env, profile, tokens, keyring } = contextOf(this)
       refuseCommandName(profile, commandWords(rootOf(this)), AMO)
       refuseOffline(this, "the amoCRM account")
       const origin = accountOrigin(args.host)
@@ -214,15 +229,10 @@ const startCommand = () =>
       // A secret is never an argument: it would land in shell history and in the run record (WC-SECR-5).
       const token = (await readSecret("amoCRM long-lived token: ", secretInputOf(this))).trim()
       if (!token) throw new CliError("validation_error", "no token was given")
-      const who = await run((events) => accountUser(transportFor(this, { origin, token }, events)))
-      refuseDuplicate(env, keyring, profile, { host: who.account, userId: who.user.id })
-      const storedIn = tokens.write(
-        profile,
-        encodeSignIn({ origin, token, userId: who.user.id }),
-        args.credentialStorage,
-      )
+      const { who, signIn, account } = await checkedToken(this, origin, token)
+      const storedIn = tokens.write(profile, signIn, args.credentialStorage)
       appStorage(env, profile, keyring).remove()
-      rememberAccount(IDENTITY, profile, `${who.account}:${who.user.id}`, env)
+      rememberAccount(IDENTITY, profile, account, env)
       answer(this, { profile, state: "saved", kind: "token", stored_in: storedIn, verified: true, ...who })
     })
 
