@@ -15,21 +15,22 @@ command without one stops with exit code 2 and lists the profiles on this comput
 
 ## Sign in
 
-Make a private integration. In amoCRM (`.amocrm.ru`): амоМаркет → ⋯ at the top left → «Создать интеграцию», with a
-name, a description, a Redirect URI (`https://wirecat.dev/webhooks/apps/amo-callback`) and «Доступ к данным аккаунта»
-ticked; save, then «Ключи» → «Сгенерировать токен», with an end date. On an account whose owner is not marked
-technical, amoCRM first asks you to sign a waiver of technical support for a private integration
-([step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)). In Kommo: Settings → Integrations →
-Create integration, then Keys and scopes → Generate a long-lived token. Either shows the token once. Then give the account's address and paste the token:
+Make the account's private integration and sign the profile in as [install and connect](installation.md) shows,
+with a key or through the integration in the browser. `amo work session status --check` shows the account and the
+user a profile acts as.
+
+## The first sync
+
+`sync` copies the deals assigned to you, plus colleagues an administrator chooses, and only the contacts and
+companies on them, into the local WireCat store. Commands such as `deals list` then read that copy offline:
 
 ```sh
-amo work session start --host https://example.amocrm.ru
-amo work session status --check
+amo work sync
+amo work deals list status:open
 ```
 
-The token is read without showing it, or from stdin, and kept in the system keyring with the address. The address
-stays as you give it: `<subdomain>.amocrm.ru`, `<subdomain>.kommo.com` or `<subdomain>.amocrm.com`. The token acts
-with the rights of the administrator who made it.
+Any other client is read live with `people` or `organizations`. Run `sync` again to bring the copy up to date;
+`amo work schedule command crm --every 1h -- sync` does it with a timer.
 
 ## Call the API
 
