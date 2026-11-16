@@ -58,8 +58,9 @@ Languages: ru, en.
   so `src/amo/oauth.ts` keeps its own `exchange`. cli-core's `tokenKeeper` and `accountTokenCodec` keep the entry
   (`amo-cli` / `oauth:amocrm:<profile>`) with the account host, the user id and the Redirect URI, which every refresh
   sends again. The refresh token rotates, so a run with moved folders refuses to refresh (`oauth.moved-rotating`).
-- The Redirect URI is b24's relay page, `https://wirecat.dev/webhooks/apps/b24-callback`, which forwards any `code`
-  and `state` to the waiting local port. Its text names Bitrix24; amo needs a page of its own (Open).
+- The Redirect URI is amo's static relay page, `https://wirecat.dev/webhooks/apps/amo-callback` (cli-docs
+  `public/webhooks/apps/amo-callback.html`, privacy policy section `amo-access`), which forwards any `code` and
+  `state` to the waiting local port.
 - A 401 on an OAuth access token is cli-core's `oauth.expired`, on which `providerCall` refreshes once; a 401 on a
   long-lived token is `session.expired`, since nothing can renew it. Each start forgets the other kind of sign-in.
 - `session status` answers `account` as the host, a string, in every answer, and `account_info` (id, name, subdomain)
@@ -138,11 +139,26 @@ Languages: ru, en.
   - Without it, a full round reads every lead and keeps the chosen users' own, a later round reads
     `order[updated_at]=desc` until a row older than the cursor, and a client is read one `GET` per id. This costs one
     request per client and reads colleagues' leads to drop them; the add-on is the cheaper path.
-  - A round overlaps the cursor by 10 minutes. Pages are numbered, so a row deleted while a round runs may shift
-    another past a page; the next round's overlap takes it.
+  - Clients are read only by the ids the kept leads name, never by listing every contact or company. A lead page read
+    once is kept in memory for the overlap's 10 minutes, so the client phases reuse it instead of listing every lead
+    again.
+  - A round overlaps the cursor by 10 minutes. Pages are numbered, so a row deleted or reassigned while a round runs
+    may shift another past a page; the next round's overlap takes a recent row, not an old one. The API has no id
+    range filter (`filter[id]` takes a list of ids only, Kommo `GET /api/v4/leads`), so paging by id is not possible:
+    `sync --rescan` heals a shifted old row.
+  - A round is cut into calls of cli-core's request budget (`--max-pages`). The cursor names a spot,
+    `<phase><page>.<offset>@<round start>`: deal pages (`d`), every client when there is no scope (`a`), the chosen
+    leads' clients on a full round (`w`), changed clients (`c`), clients on changed leads (`n`) and deletions (`r`).
+    A call that runs out of requests answers what it has with the spot it reached; one that could not move refuses.
+  - A later round still reads by id every client on a changed chosen lead, stored or not. Only a client new to the
+    lead needs it; telling which needs the store's links or `*_linked` events (open).
 - Deletions come from `<entity>_deleted` and `<entity>_restored` events since the cursor; the last event of a record
   decides. Stage history comes from `lead_status_changed` events (`value_after[0].lead_status`), read whole each time
-  after the last one kept, since the event order is not documented.
+  after the last one kept, since the event order is not documented. Under `mine` it keeps only the chosen users'
+  leads, and its cursor `h<from>.<page>.<offset>.<latest>` resumes inside a page.
+- `filter[type]` takes a comma string in Kommo's reference (`GET /api/v4/events`) and an array in amoCRM's
+  ([events-and-notes](https://www.amocrm.ru/developers/content/crm_platform/events-and-notes)): `.amocrm.ru` hosts get
+  `filter[type][]`, others the comma string. Unchecked live (open).
 - Won is status 142 and lost 143 in every pipeline
   ([leads_pipelines](https://www.amocrm.ru/developers/content/crm_platform/leads_pipelines)); a lead's
   `_embedded.loss_reason` is its loss reason. Amounts are in the account's one currency.
@@ -224,17 +240,24 @@ the main pipeline").
 | `--position` on people | refused | amoCRM keeps a job title in an account's own field with no documented code |
 | any user may choose colleagues to sync | only an administrator | only an administrator can read the users |
 | writes take an operation id once | not idempotent | amoCRM stores no `request_id` |
-| a relay page of its own on wirecat.dev | b24's page | amo has none yet (Open) |
-| `hosts` leave out wirecat.dev | name it | the sign-in's code passes through its relay page in the browser; cli-dev's `undeclared-host` asks for it |
-| `schedule` (a sync timer) | not yet | the plan's tree has it; it comes with phase 6's digest (Open) |
-| `account remove` | none | not in the plan's command tree for amo; an open question for the owner |
+| relay page `webhooks/apps/b24-callback` | `webhooks/apps/amo-callback` | its text and privacy note name amoCRM |
+| `hosts` leave out wirecat.dev | name it | `RELAY_URL` names it; cli-dev's `undeclared-host` fails without it (checked 2026-11-16) |
+| `account remove` revokes nothing (`revoked: null`) | the same | amoCRM has no call that revokes a token |
 
 ## Open
 
-- amo's own relay page on wirecat.dev (cli-docs `public/webhooks/apps/`), with amoCRM in its text and the privacy
-  page; until then `RELAY_URL` is b24's.
-- Mount cli-core's `scheduleCommandFor`, as b24's `src/commands/schedule.ts`, so `sync` can run on a timer.
-- cli-base `PARITY_GROUPS` should name amo with b24 among the CRM CLIs; not opened, since this repository is local.
+- cli-base `PARITY_GROUPS` should name amo with b24 among the CRM CLIs, with the differences above (no `leads`,
+  `products`, `deals delete`). Not opened: cli-base installs group members from npm (`src/dev/family.ts`), and amo is
+  on neither npm nor GitHub yet.
+- The stored `redirectUri` is always `RELAY_URL`. It stays: it is how a sign-in made with another Redirect URI keeps
+  refreshing if the page ever moves.
+- `src/amo/oauth.ts` keeps its own JSON code exchange. cli-core's `exchange` could take a JSON body option and send
+  `redirect_uri` on refresh; worth folding in once a second provider needs it.
+- cli-core: the OAuth keeper's lock retry (`lockRetryMs ?? 50`) and the file lock's `RETRY_MS` (20) are real waits
+  that tests cannot inject.
+- A later round re-reads every client of a changed lead (see the store and sync).
+- Live checks: the `filter[type]` form on a `.amocrm.ru` account, `mode=post_message`, a refresh after 24 hours, and
+  the answer of an account without the add-on.
 - How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
 - The event types `contact_deleted`, `company_deleted` and their `_restored` follow the `lead_deleted` pattern; no
   live answer has been seen.

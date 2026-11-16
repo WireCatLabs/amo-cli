@@ -73,6 +73,19 @@
     },
     {
       "path": [
+        "account",
+        "remove"
+      ],
+      "summary": "sign this profile out and forget it, keeping or deleting its data",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "account.remove",
+      "entity": "account_removal"
+    },
+    {
+      "path": [
         "sync"
       ],
       "summary": "bring the CRM's copy in the local store up to date: pipelines, companies,…",
@@ -588,6 +601,117 @@
     },
     {
       "path": [
+        "schedule",
+        "command"
+      ],
+      "summary": "run amo <args…> on a timer — reads save what they read, so this is how a…",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "schedule.command"
+    },
+    {
+      "path": [
+        "schedule",
+        "agent"
+      ],
+      "summary": "start an agent (claude, codex, gemini, cursor, opencode, openclaw, hermes,…",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "schedule.agent"
+    },
+    {
+      "path": [
+        "schedule",
+        "list"
+      ],
+      "summary": "the schedules, when they run and how their last run went",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "schedule.list",
+      "entity": "scheduled_job"
+    },
+    {
+      "path": [
+        "schedule",
+        "agents",
+        "list"
+      ],
+      "summary": "the agents a schedule may start, and which are on PATH here",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "schedule.agents.list",
+      "entity": "schedule_harness"
+    },
+    {
+      "path": [
+        "schedule",
+        "run"
+      ],
+      "summary": "run a schedule now, as its timer would, and wait for it; a paused one runs too",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "schedule.run"
+    },
+    {
+      "path": [
+        "schedule",
+        "remove"
+      ],
+      "summary": "stop a schedule and remove its timer; its past output stays",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "schedule.remove"
+    },
+    {
+      "path": [
+        "schedule",
+        "pause"
+      ],
+      "summary": "take a schedule off its timer and keep it; run runs it, resume puts it back",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "schedule.pause"
+    },
+    {
+      "path": [
+        "schedule",
+        "resume"
+      ],
+      "summary": "put a paused schedule back on its timer",
+      "effects": {
+        "remote": "none",
+        "local": "write"
+      },
+      "permission": "schedule.resume"
+    },
+    {
+      "path": [
+        "schedule",
+        "exec"
+      ],
+      "summary": "what a timer runs, given the schedule's file; to run one by hand, use run",
+      "effects": {
+        "remote": "write",
+        "local": "write"
+      },
+      "permission": "schedule.exec"
+    },
+    {
+      "path": [
         "doctor"
       ],
       "summary": "the state this installation is in, without connecting unless --online",
@@ -921,6 +1045,33 @@
       "fields": [
         "effect",
         "family"
+      ]
+    },
+    "scheduled_job": {
+      "fields": [
+        "name",
+        "kind",
+        "when",
+        "notify",
+        "deliver_to",
+        "harness",
+        "reports_cost",
+        "spent_today_usd",
+        "max_cost_usd",
+        "max_cost_per_day_usd"
+      ]
+    },
+    "schedule_harness": {
+      "fields": [
+        "id",
+        "name",
+        "programs",
+        "reports_cost",
+        "restricted",
+        "restricted_reason",
+        "allowed_with_ack",
+        "installed",
+        "path"
       ]
     },
     "run": {

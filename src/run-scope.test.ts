@@ -56,6 +56,8 @@ describe("each remote command runs inside cli-core's run", () => {
     },
     skip: {
       "mcp serve": "listens until stopped",
+      "schedule run": "starts the schedule's entry as its own process; src/schedule.test.ts runs it against a fake one",
+      "schedule exec": "the timer's entry, which starts a process; src/schedule.test.ts runs it against a fake one",
       doctor:
         "cli-core's appDoctorCommand answers --online outside a run of its own; drop this once core runs it inside",
     },

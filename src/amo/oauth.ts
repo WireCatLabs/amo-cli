@@ -28,10 +28,10 @@ import { isRecord } from "./json.js"
 export const PROVIDER = "amocrm"
 /**
  * The integration's Redirect URI, which amoCRM sends the browser to with `code` and `state` (amocrm.ru developers
- * oauth/step-by-step). b24's relay page forwards any `code` and `state` to the waiting local port; amo uses it until
- * wirecat.dev has a page of amo's own (docs/dev/DESIGN.md, open items).
+ * oauth/step-by-step). The static page forwards any `code` and `state` to the waiting local port (cli-docs
+ * public/webhooks/apps/amo-callback.html).
  */
-export const RELAY_URL = "https://wirecat.dev/webhooks/apps/b24-callback"
+export const RELAY_URL = "https://wirecat.dev/webhooks/apps/amo-callback"
 const REQUEST_MS = 30_000
 const HINT = /^[\w .,:'`-]{1,200}$/
 

@@ -23,4 +23,8 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 - `people`, `organizations` and `users` read the account live; contacts and companies can be created and changed.
   Someone who is not the administrator sees another user's client's phones and e-mails in at most 100 `show`s a day.
 - `session start --client-id <id>` signs in through your own private integration with OAuth, and renews the access
-  token itself.
+  token itself. The integration's Redirect URI is `https://wirecat.dev/webhooks/apps/amo-callback`.
+- `account remove` forgets a profile's sign-in and files; `--delete-data` also deletes the account's copy, and refuses
+  while another profile reads the same account.
+- `schedule` runs `sync` on a timer.
+- `sync` resumes inside a page when a run's request budget ends, and reads clients only by the ids its deals name.

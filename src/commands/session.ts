@@ -29,7 +29,7 @@ import {
 } from "@wirecat/cli-core/cli"
 import { Command } from "commander"
 import { accountOrigin, decodeSignIn, encodeSignIn } from "../amo/account.js"
-import { appSignIn, appSourceOf, appStorage } from "../amo/oauth.js"
+import { appSignIn, appSourceOf, appStorage, RELAY_URL } from "../amo/oauth.js"
 import { configuration } from "../config.js"
 import { type AmoEnvironment, appAuthFor, contextOf, storedSignIn, transportFor, withAccount } from "../context.js"
 import { IDENTITY } from "../identity.js"
@@ -47,6 +47,16 @@ const storageOf = (raw: string): TokenStorage => {
 const tokensHere = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined) =>
   new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) })
 
+/** The account host and user a profile's saved sign-in reaches, either kind; one from `AMO_TOKEN` is no profile's. */
+export const signedInAs = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined, profile: string) => {
+  const app = appStorage(env, profile, keyring).read()?.account
+  if (app) return { host: new URL(app.host).host, userId: app.userId }
+  const saved = tokensHere(env, keyring).read(profile)
+  if (!saved || saved.source === "environment") return undefined
+  const signIn = decodeSignIn(saved.secret)
+  return { host: new URL(signIn.origin).host, userId: signIn.userId }
+}
+
 /** A second profile on the same account and user would sync the same copy twice and split its permissions. */
 const refuseDuplicate = (
   env: NodeJS.ProcessEnv,
@@ -56,19 +66,10 @@ const refuseDuplicate = (
 ) => {
   // biome-ignore lint/plugin/no-own-settings: this check reads every profile, and baseContext names one
   const { configuredProfiles } = configuration.resolveSettings({}, { env, needsProfile: false })
-  const tokens = tokensHere(env, keyring)
-  const signedInAs = (one: string) => {
-    const app = appStorage(env, one, keyring).read()?.account
-    if (app) return { host: new URL(app.host).host, userId: app.userId }
-    const saved = tokens.read(one)
-    if (!saved || saved.source === "environment") return undefined
-    const signIn = decodeSignIn(saved.secret)
-    return { host: new URL(signIn.origin).host, userId: signIn.userId }
-  }
   const other = profilesHere(IDENTITY, configuredProfiles, env).find((one) => {
     if (one === profile) return false
     try {
-      const found = signedInAs(one)
+      const found = signedInAs(env, keyring, one)
       return found?.host === at.host && found.userId === at.userId
     } catch {
       return false
@@ -189,7 +190,8 @@ const startCommand = () =>
         "checked against the account, and only then kept in the keyring with the address, or in a private file. " +
         "The token acts with the rights of the administrator who made it. With --client-id it signs in through " +
         "that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens " +
-        "act with the rights of the user who signs in. Each sign-in forgets the profile's other kind",
+        `act with the rights of the user who signs in; the integration's Redirect URI must be ${RELAY_URL}. ` +
+        "Each sign-in forgets the profile's other kind",
     )
     .requiredOption("--host <address>", "the account's address, such as https://example.amocrm.ru, kept as given")
     .option(
