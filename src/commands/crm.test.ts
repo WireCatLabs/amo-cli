@@ -23,6 +23,19 @@ const sync = async (fake: FakeAmo) => {
   return ran.json()
 }
 
+/** `count` more leads of the signed-in user, each with a contact of its own. */
+const grown = (fake: FakeAmo, count: number) => {
+  const [lead] = fake.data.leads
+  const [contact] = fake.data.contacts
+  if (!lead || !contact) throw new Error("seed")
+  for (let at = 0; at < count; at++) {
+    fake.data.contacts.push({ ...contact, id: 1000 + at, name: `Extra ${at}`, companies: [] })
+    fake.data.leads.push({ ...lead, id: 2000 + at, name: `Extra lead ${at}`, contacts: [1000 + at], companies: [] })
+  }
+}
+
+const reads = (fake: FakeAmo, path: string) => fake.calls.filter((one) => one.method === "GET" && one.path === path)
+
 describe("sync", () => {
   it.each([
     ["with the API filter add-on", true],
@@ -77,7 +90,7 @@ describe("sync", () => {
     await sync(fake)
     const second = fake.calls.slice(before)
     expect(second.some((one) => one.query["filter[updated_at][from]"] !== undefined)).toBe(true)
-    expect(second.some((one) => one.query["filter[type]"]?.[0] === "lead_deleted,lead_restored")).toBe(true)
+    expect(second.some((one) => one.query["filter[type][]"]?.join() === "lead_deleted,lead_restored")).toBe(true)
     const deals = await listed(fake, ["deals", "list"])
     expect(idsOf(deals)).toEqual(["301", "302"])
     expect(deals.items.find((one) => one.external_id === "301")).toMatchObject({ title: "Test lead renamed" })
@@ -184,4 +197,35 @@ describe("writes", () => {
     expect([renamed.code, renamed.err]).toEqual([0, ""])
     expect(fake.data.companies.at(-1)?.name).toBe("Example Ltd")
   })
+})
+
+describe("sync in small runs", () => {
+  it("lists the leads once without the add-on, and reads only the clients they name, by id", async () => {
+    const fake = account({ apiFilter: false })
+    grown(fake, 3)
+    await sync(fake)
+    expect(reads(fake, "/api/v4/leads")).toHaveLength(1)
+    expect([...reads(fake, "/api/v4/contacts"), ...reads(fake, "/api/v4/companies")]).toEqual([])
+    expect(reads(fake, "/api/v4/contacts/1002")).toHaveLength(1)
+    expect(reads(fake, "/api/v4/contacts/403")).toEqual([])
+  })
+
+  it.each([true, false])(
+    "goes on where a run of 20 requests stopped, filters %s",
+    async (apiFilter) => {
+      const fake = account({ apiFilter })
+      grown(fake, 40)
+      await sync(fake)
+      const at = Math.floor(Date.now() / 1000) + 5
+      for (const lead of fake.data.leads) lead.updated_at = at
+      let state = ""
+      for (let run = 0; run < 30 && state !== "complete"; run++) {
+        const ran = await amo(["work", "sync", "--max-pages", "20", "--json"], { account: fake })
+        if (!ran.out) throw new Error(`${ran.code} ${ran.err.slice(-600)}`)
+        state = String((ran.json().item as { state?: string }).state)
+      }
+      expect(state).toBe("complete")
+    },
+    60_000,
+  )
 })

@@ -28,7 +28,10 @@ export const ROUTES = {
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES]
 
-/** The API's word for each kind the CRM port copies. */
+/**
+ * The API's word for each kind the CRM port copies. `event` prefixes its `_deleted` and `_restored` event types
+ * (https://www.amocrm.ru/developers/content/crm_platform/events-and-notes, the table of event types, read 2026-11-16).
+ */
 export const ENTITIES = {
   deal: {
     list: ROUTES.leads,

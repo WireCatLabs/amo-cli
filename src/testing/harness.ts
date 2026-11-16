@@ -42,12 +42,16 @@ export const amo = async (
 ): Promise<Ran> => {
   const out: string[] = []
   const err: string[] = []
+  let clock = Date.now()
   const options: RunOptions & AmoEnvironment = {
     streams: { data: (text) => out.push(text), diagnostic: (text) => err.push(text) },
     tty: false,
     keyring,
     fetch: account.fetch,
-    sleep: async () => {},
+    sleep: async (ms) => {
+      clock += ms
+    },
+    now: () => clock,
     ...(env ? { env: { ...process.env, ...env } } : {}),
     ...(answer ? { answer } : {}),
     ...(openBrowser ? { openBrowser } : {}),

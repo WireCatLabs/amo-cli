@@ -6,6 +6,7 @@ import {
   type CrmCondition,
   type CrmLiveKind,
   type CrmLiveQuery,
+  type CrmPage,
   type CrmSource,
   crmValues,
 } from "@wirecat/cli-core/crm"
@@ -27,7 +28,6 @@ const PAGE = 250
 const EVENTS_PAGE = 100
 /** Ids in one `filter[id][]`: amoCRM recommends 50 records a request (amocrm.ru "Рекомендации"). */
 const CHUNK = 50
-const LINKED = "l"
 
 const seconds = (ms: number) => Math.floor(ms / 1000)
 
@@ -73,12 +73,26 @@ const readOne = async (caller: Caller, route: Route, externalId: string, query: 
   }
 }
 
-/** `<page>@<when the round started>`, or `l<offset>@…` for the clients a `mine` round reads by id after its own. */
-const pageOf = (page: string | undefined, now: number) => {
-  const [at, started] = (page ?? "").split("@")
-  const linked = at?.startsWith(LINKED) ? Number(at.slice(LINKED.length)) || 0 : null
-  return { at: linked === null ? Number(at) || 1 : 1, linked, started: Number(started) || now }
+/**
+ * Where a round stands, `<phase><page>.<offset>@<when the round started>`: the phase (`d` deals, `w` the clients on
+ * the chosen users' leads, `c` changed clients, `n` the clients on changed leads, `a` every client, `r` deletions),
+ * the page, and how far into it. A call the run's budget cuts answers what it read and this place, so the next run
+ * goes on from there (WC-LIFE-12).
+ */
+interface Spot {
+  ph: string
+  p: number
+  o: number
 }
+const spotOf = (page: string | undefined, now: number) => {
+  const found = /^([a-z])(\d+)\.(\d+)@(\d+)$/.exec(page ?? "")
+  if (!found) return { spot: null, started: now }
+  return { spot: { ph: found[1] ?? "", p: Number(found[2]), o: Number(found[3]) }, started: Number(found[4]) }
+}
+const keyOf = (spot: Spot) => `${spot.ph}${spot.p}.${spot.o}`
+
+/** The run's budget said no inside a call: the call answers what it has read so far. */
+class Cut extends Error {}
 
 /** The users whose deals a `mine` scope copies: the chosen ones, else the signed-in user (b24's ruling 2026-11-12). */
 const chosenOf = (context?: CrmCallContext): string[] | null => {
@@ -110,8 +124,9 @@ const filtersOf = (kind: CrmLiveKind, conditions: readonly CrmCondition[]): Reco
     }
     if ((field === "created_at" || field === "updated_at") && typeof value === "number" && op !== "!=" && op !== "in") {
       const ms = value
+      // amoCRM keeps whole seconds: `=` names the second the time falls in.
       if (op === "=" || op === ">=" || op === ">")
-        set(`filter[${field}][from]`, op === ">" ? seconds(ms) + 1 : Math.ceil(ms / 1000))
+        set(`filter[${field}][from]`, op === ">" ? seconds(ms) + 1 : op === "=" ? seconds(ms) : Math.ceil(ms / 1000))
       if (op === "=" || op === "<=" || op === "<")
         set(`filter[${field}][to]`, op === "<" ? Math.ceil(ms / 1000) - 1 : seconds(ms))
       continue
@@ -148,16 +163,28 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
   const now = options.now ?? Date.now
   const size = options.page ?? PAGE
   const asked = options.asked ?? (async () => ({ mode: "mine" as const, setting: "scope", chosen: "unassigned" }))
-  /** core paid for a call's first request; each further one is spent from the run's budget. */
-  const metered = (context?: CrmCallContext): Caller => {
+  /**
+   * core paid for a call's first request; each further one is spent from the run's budget. With `cut`, a spent budget
+   * is a `Cut` the call catches, and `spent()` the reason it rethrows when it read nothing.
+   */
+  const metered = (context?: CrmCallContext, cut = false) => {
     let paid = false
-    return {
+    let spent: unknown
+    const caller: Caller = {
       request: (request) => {
-        if (paid) context?.spend()
+        if (paid && context)
+          try {
+            context.spend()
+          } catch (error) {
+            if (!cut) throw error
+            spent = error
+            throw new Cut()
+          }
         paid = true
         return account().request(request)
       },
     }
+    return Object.assign(caller, { spent: () => spent })
   }
   let about: Promise<Account> | undefined
   const accountOf = (caller: Caller = account()) =>
@@ -220,6 +247,21 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
     remember(await byIds(caller, "deal", missing, {}))
     for (const lead of missing) if (!owners.has(lead)) owners.set(lead, "")
   }
+  /** One request's worth of records by id: a `filter[id][]` chunk with the add-on, else one record. */
+  const readSome = async (caller: Caller, kind: AmoKind, ids: readonly string[], query: Record<string, QueryValue>) => {
+    const { filters } = await accountOf(caller)
+    const chunk = ids.slice(0, filters ? CHUNK : 1)
+    return { read: chunk.length, rows: await byIds(caller, kind, chunk, query) }
+  }
+  /** One request towards the owners of leads no page has shown yet; false when none is left to read. */
+  const resolveOwners = async (caller: Caller, leads: readonly string[]) => {
+    const missing = [...new Set(leads)].filter((lead) => !owners.has(lead))
+    if (missing.length === 0) return false
+    const { read, rows } = await readSome(caller, "deal", missing, {})
+    remember(rows)
+    for (const lead of missing.slice(0, read)) if (!owners.has(lead)) owners.set(lead, "")
+    return true
+  }
 
   /**
    * Leads of one round, oldest id first; or, after a cursor, changed since `from`: by `filter[updated_at][from]` with
@@ -245,54 +287,46 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
   }
 
   /**
-   * The contacts and companies on the chosen users' leads: every lead of theirs, or with `from` those changed since.
-   * The rounds of companies and contacts start minutes apart, so the second reuses the first's list.
+   * One page of the leads a round reads: in a full `mine` round only the chosen users' (narrowed by the add-on, else
+   * kept from every lead), after a cursor every changed one, as core drops a lead given away by its assignee. The
+   * clients' rounds walk the same pages before the deals', so a run lists each lead page once (research §4 counts an
+   * account enumerated over and over as a cause of a block).
    */
-  const lists = new Map<string, { at: number; found: Promise<Record<"person" | "organization", Set<string>>> }>()
-  const clientsOf = (caller: Caller, chosen: readonly string[], from: number | null, started: number) => {
-    const key = `${chosen.join(",")}>${from ?? ""}`
-    const kept = lists.get(key)
-    if (kept && Math.abs(started - kept.at) < OVERLAP_MS) return kept.found
-    const found = (async () => {
+  const leadPages = new Map<string, { at: number; page: Promise<{ rows: Raw[]; more: boolean }> }>()
+  const leadPage = (caller: Caller, at: number, from: number | null, chosen: readonly string[] | null) => {
+    const key = `${at}|${from ?? ""}|${chosen?.join(",") ?? ""}`
+    const kept = leadPages.get(key)
+    if (kept && now() - kept.at < OVERLAP_MS) return kept.page
+    const page = (async () => {
       const { filters } = await accountOf(caller)
-      const clients = { person: new Set<string>(), organization: new Set<string>() }
-      const narrow: Record<string, QueryValue> = filters ? { "filter[responsible_user_id][]": chosen.map(Number) } : {}
-      for (let at = 1; ; at++) {
-        const { rows, more } = await round(caller, "deal", at, from, narrow)
-        remember(rows)
-        for (const raw of rows.filter((one) => chosen.includes(ownerOf(one)))) {
-          for (const contact of linkedIds(raw, "contacts")) clients.person.add(contact)
-          for (const company of linkedIds(raw, "companies")) clients.organization.add(company)
-        }
-        if (!more || rows.length === 0) return clients
-      }
+      const narrow: Record<string, QueryValue> =
+        from === null && chosen && filters ? { "filter[responsible_user_id][]": chosen.map(Number) } : {}
+      const { rows, more } = await round(caller, "deal", at, from, narrow)
+      remember(rows)
+      return { rows: from === null && chosen ? rows.filter((raw) => chosen.includes(ownerOf(raw))) : rows, more }
     })()
-    found.catch(() => lists.delete(key))
-    lists.set(key, { at: started, found })
+    page.catch(() => leadPages.delete(key))
+    leadPages.set(key, { at: now(), page })
+    return page
+  }
+
+  /** The clients of a round already read in this process, so one on many leads is read once. */
+  const seen = new Map<string, Set<string>>()
+  const seenOf = (kind: CrmKind, started: number) => {
+    const key = `${kind}@${started}`
+    const found = seen.get(key) ?? new Set<string>()
+    seen.set(key, found)
     return found
   }
 
-  /** `<entity>_deleted` and `_restored` events since `from`: the last of each record says whether it is gone. */
-  const removedSince = async (caller: Caller, kind: AmoKind, from: number) => {
-    const { event } = ENTITIES[kind]
-    const last = new Map<string, { at: number; deleted: boolean }>()
-    for (let page = 1; ; page++) {
-      const { rows, more } = await listPage(caller, ROUTES.events, "events", {
-        "filter[type]": `${event}_deleted,${event}_restored`,
-        "filter[created_at][from]": from,
-        limit: EVENTS_PAGE,
-        page,
-      })
-      for (const raw of rows) {
-        const entity = id(raw.entity_id)
-        const at = Number(raw.created_at) || 0
-        if (entity && at >= (last.get(entity)?.at ?? 0))
-          last.set(entity, { at, deleted: raw.type === `${event}_deleted` })
-      }
-      if (!more || rows.length === 0) break
-    }
-    return [...last].flatMap(([entity, { deleted }]) => (deleted ? [entity] : []))
-  }
+  /**
+   * The event types to list: Kommo's events-list takes a comma string in `filter[type]`, amoCRM.ru's events-and-notes
+   * an array; neither page names a form both take, so each host gets its own reference's.
+   */
+  const typesOf = (types: readonly string[]): Record<string, QueryValue> =>
+    new URL(account().origin).hostname.endsWith(".amocrm.ru")
+      ? { "filter[type][]": types }
+      : { "filter[type]": types.join(",") }
 
   const isAdmin = () => account().isAdmin()
 
@@ -336,96 +370,174 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       if (since !== null && Number.isNaN(since)) return { reset: true }
       if (kind === "lead") return { items: [], hasMore: false, cursor: null }
       const amoKind = kind as AmoKind
-      const caller = metered(context)
-      const { at, linked, started } = pageOf(page, now())
+      const caller = metered(context, true)
+      const { spot: given, started } = spotOf(page, now())
       const from = since === null ? null : seconds(since - OVERLAP_MS)
       const chosen = chosenOf(context)
-      const { filters } = await accountOf(caller)
-      const ended = async (rows: Raw[]): Promise<CrmChanges<CrmRecords[K]>> => ({
-        items: await mapped(kind, rows, caller),
-        hasMore: false,
-        ...(from === null ? {} : { removed: await removedSince(caller, amoKind, from) }),
-        cursor: new Date(started).toISOString(),
-      })
-      const next = async (rows: Raw[], cursorOf: string): Promise<CrmChanges<CrmRecords[K]>> => ({
-        items: await mapped(kind, rows, caller),
-        hasMore: true,
-        nextCursor: `${cursorOf}@${started}`,
-      })
-      if (amoKind === "deal") {
-        // A round of changes reads every assignee's leads, so core sees one given away; a full round only the chosen.
-        const narrow: Record<string, QueryValue> =
-          from === null && chosen && filters ? { "filter[responsible_user_id][]": chosen.map(Number) } : {}
-        const { rows, more } = await round(caller, "deal", at, from, narrow)
-        remember(rows)
-        const kept = from === null && chosen ? rows.filter((raw) => chosen.includes(ownerOf(raw))) : rows
-        return more && rows.length ? next(kept, String(at + 1)) : ended(kept)
+      const client = amoKind === "deal" ? null : (amoKind as "person" | "organization")
+      const first: Spot = { ph: client === null ? "d" : !chosen ? "a" : from === null ? "w" : "c", p: 1, o: 0 }
+      let spot = given ?? first
+      const rows: Raw[] = []
+      const kept = seenOf(kind, started)
+      const gone = new Map<string, { at: number; deleted: boolean }>()
+      const answer = async (done: boolean): Promise<CrmChanges<CrmRecords[K]>> => {
+        const removed = [...gone].flatMap(([entity, { deleted }]) => (deleted ? [entity] : []))
+        return {
+          items: await mapped(kind, rows, caller),
+          ...(removed.length ? { removed } : {}),
+          hasMore: !done,
+          ...(done ? { cursor: new Date(started).toISOString() } : { nextCursor: `${keyOf(spot)}@${started}` }),
+        }
       }
-      const client = amoKind as "person" | "organization"
-      if (!chosen) {
-        const { rows, more } = await round(caller, client, at, from)
-        return more && rows.length ? next(rows, String(at + 1)) : ended(rows)
+      const after = (more: boolean, next: string): boolean => {
+        spot = more ? { ph: spot.ph, p: spot.p + 1, o: 0 } : { ph: next, p: 1, o: 0 }
+        return more
       }
-      // The clients on the chosen users' leads: all of them in a full round, those on changed leads after a cursor.
-      const named = [...(await clientsOf(caller, chosen, from, started))[client]]
-      if (linked !== null) {
-        const chunk = named.slice(linked, linked + size)
-        // The round already kept a chosen user's own client, and after a cursor every named client changed since it.
-        const rows = (await byIds(caller, client, chunk, { with: WITH[client] })).filter((raw) =>
-          from === null ? !chosen.includes(ownerOf(raw)) : Number(raw.updated_at) < from,
-        )
-        return linked + size < named.length ? next(rows, `${LINKED}${linked + size}`) : ended(rows)
+      const end = from === null ? "" : "r"
+      /** Reads the page's named clients from the spot's offset, one request at a time, each client once a round. */
+      const readNamed = async (names: readonly string[]) => {
+        while (spot.o < names.length) {
+          const left = names.slice(spot.o).filter((one) => !kept.has(one))
+          if (left.length === 0) {
+            spot = { ...spot, o: names.length }
+            break
+          }
+          const { read, rows: found } = await readSome(caller, client ?? "person", left, {
+            with: WITH[client ?? "person"],
+          })
+          for (const raw of found) rows.push(raw)
+          for (const one of left.slice(0, read)) kept.add(one)
+          spot = { ...spot, o: names.indexOf(left[read - 1] ?? "") + 1 }
+          // A page saved now is kept if the process ends before the next answer.
+          if (rows.length >= CHUNK) return false
+        }
+        return true
       }
-      // Without the add-on a full round lists every client once, so the named ones are kept from it, not read again.
-      const listsAll = from === null && !filters
-      const narrow: Record<string, QueryValue> =
-        from === null && filters ? { "filter[responsible_user_id][]": chosen.map(Number) } : {}
-      const { rows, more } = await round(caller, client, at, from, narrow)
-      if (from !== null)
-        await ownersOf(
-          caller,
-          rows.flatMap((raw) => linkedIds(raw, "leads")),
-        )
-      const own = new Set(named)
-      const kept = rows.filter(
-        (raw) =>
-          chosen.includes(ownerOf(raw)) ||
-          (listsAll && own.has(id(raw.id) ?? "")) ||
-          (from !== null && linkedIds(raw, "leads").some((lead) => chosen.includes(owners.get(lead) ?? ""))),
-      )
-      if (more && rows.length) return next(kept, String(at + 1))
-      if (listsAll || named.length === 0) return ended(kept)
-      return next(kept, `${LINKED}0`)
+      try {
+        for (;;) {
+          if (spot.ph === "") return await answer(true)
+          if (spot.ph === "d") {
+            const { rows: leads, more } = await leadPage(caller, spot.p, from, chosen)
+            for (const raw of leads) rows.push(raw)
+            if (after(more, end)) return await answer(false)
+            continue
+          }
+          if (spot.ph === "a" && client) {
+            const { rows: found, more } = await round(caller, client, spot.p, from)
+            for (const raw of found) rows.push(raw)
+            if (after(more && found.length > 0, end)) return await answer(false)
+            continue
+          }
+          if ((spot.ph === "w" || spot.ph === "n") && client && chosen) {
+            const { rows: leads, more } = await leadPage(caller, spot.p, from, chosen)
+            const own = leads.filter((raw) => chosen.includes(ownerOf(raw)))
+            const names = [
+              ...new Set(own.flatMap((raw) => linkedIds(raw, client === "person" ? "contacts" : "companies"))),
+            ]
+            if (!(await readNamed(names))) return await answer(false)
+            if (after(more, spot.ph === "w" ? "" : "r")) return await answer(false)
+            continue
+          }
+          if (spot.ph === "c" && client && chosen && from !== null) {
+            const { rows: changed, more } = await round(caller, client, spot.p, from)
+            while (spot.o < changed.length) {
+              const raw = changed[spot.o] as Raw
+              const leads = linkedIds(raw, "leads")
+              const ours = () =>
+                chosen.includes(ownerOf(raw)) || leads.some((lead) => chosen.includes(owners.get(lead) ?? ""))
+              while (!ours() && (await resolveOwners(caller, leads))) {}
+              if (ours()) {
+                rows.push(raw)
+                kept.add(id(raw.id) ?? "")
+              }
+              spot = { ...spot, o: spot.o + 1 }
+            }
+            if (after(more, "n")) return await answer(false)
+            continue
+          }
+          if (spot.ph === "r" && from !== null) {
+            const { event } = ENTITIES[amoKind]
+            const { rows: events, more } = await listPage(caller, ROUTES.events, "events", {
+              ...typesOf([`${event}_deleted`, `${event}_restored`]),
+              "filter[created_at][from]": from,
+              limit: EVENTS_PAGE,
+              page: spot.p,
+            })
+            for (const raw of events) {
+              const entity = id(raw.entity_id)
+              const at = Number(raw.created_at) || 0
+              if (entity && at >= (gone.get(entity)?.at ?? 0))
+                gone.set(entity, { at, deleted: raw.type === `${event}_deleted` })
+            }
+            after(more && events.length > 0, "")
+            continue
+          }
+          return { reset: true }
+        }
+      } catch (error) {
+        if (!(error instanceof Cut)) throw error
+        if (keyOf(spot) === keyOf(given ?? first)) throw caller.spent()
+        return answer(false)
+      }
     },
     async stageHistory(_kind, since, after, context) {
-      const caller = metered(context)
-      const from = after === undefined ? seconds(since) : Number(after) || seconds(since)
+      const caller = metered(context, true)
+      const chosen = chosenOf(context)
+      // `h<from>.<page>.<offset>.<latest>` inside a span; the latest time read once the span is done.
+      const inside = /^h(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(after ?? "")
+      const from = inside ? Number(inside[1]) : after === undefined ? seconds(since) : Number(after) || seconds(since)
+      let at = inside ? { p: Number(inside[2]), o: Number(inside[3]) } : { p: 1, o: 0 }
+      let last = inside ? Number(inside[4]) : from
+      const start = `${at.p}.${at.o}`
       const items: CrmStageEntry[] = []
-      let last = from
-      for (let page = 1; ; page++) {
-        const { rows, more } = await listPage(caller, ROUTES.events, "events", {
-          "filter[type]": "lead_status_changed",
-          "filter[created_at][from]": from,
-          limit: EVENTS_PAGE,
-          page,
-        })
-        for (const raw of rows) {
-          // Kommo events-list: `value_after: [{lead_status: {id, pipeline_id}}]`.
-          const status = fieldOf(rawsOf(raw.value_after)[0], "lead_status")
-          const externalId = text(raw.id)
-          const item = id(raw.entity_id)
-          const stage = id(fieldOf(status, "id"))
-          const pipeline = id(fieldOf(status, "pipeline_id"))
-          const at = Number(raw.created_at)
-          if (!externalId || !item || !stage || !pipeline || !(at > 0)) continue
-          items.push({ externalId, kind: "deal", item, pipeline, stage, at: at * 1000 })
-          last = Math.max(last, at)
-        }
-        if (!more || rows.length === 0) break
+      const answer = (done: boolean): CrmPage<CrmStageEntry> => {
+        items.sort((a, b) => a.at - b.at)
+        return done
+          ? { items, hasMore: false, cursor: String(last) }
+          : { items, hasMore: true, nextCursor: `h${from}.${at.p}.${at.o}.${last}` }
       }
-      // The event order is not documented, so the whole span is read in one call; the store keeps each entry once.
-      items.sort((a, b) => a.at - b.at)
-      return { items, hasMore: false, cursor: String(last) }
+      try {
+        for (;;) {
+          const { rows, more } = await listPage(caller, ROUTES.events, "events", {
+            ...typesOf(["lead_status_changed"]),
+            "filter[created_at][from]": from,
+            limit: EVENTS_PAGE,
+            page: at.p,
+          })
+          while (at.o < rows.length) {
+            const raw = rows[at.o] as Raw
+            // Kommo events-list: `value_after: [{lead_status: {id, pipeline_id}}]`.
+            const status = fieldOf(rawsOf(raw.value_after)[0], "lead_status")
+            const externalId = text(raw.id)
+            const item = id(raw.entity_id)
+            const stage = id(fieldOf(status, "id"))
+            const pipeline = id(fieldOf(status, "pipeline_id"))
+            const when = Number(raw.created_at)
+            // Under `mine` only the scope's deals: the events list cannot be narrowed by owner (events-and-notes).
+            if (chosen && item) while (await resolveOwners(caller, [item])) {}
+            if (
+              externalId &&
+              item &&
+              stage &&
+              pipeline &&
+              when > 0 &&
+              (!chosen || chosen.includes(owners.get(item) ?? ""))
+            ) {
+              items.push({ externalId, kind: "deal", item, pipeline, stage, at: when * 1000 })
+              last = Math.max(last, when)
+            }
+            at = { ...at, o: at.o + 1 }
+          }
+          if (!more || rows.length === 0) return answer(true)
+          at = { p: at.p + 1, o: 0 }
+          // The event order is not documented: each page is saved, and the store keeps an entry once.
+          return answer(false)
+        }
+      } catch (error) {
+        if (!(error instanceof Cut)) throw error
+        if (`${at.p}.${at.o}` === start) throw caller.spent()
+        return answer(false)
+      }
     },
     async users(context) {
       return (await readAll(metered(context), ROUTES.users, "users")).flatMap((raw) => toUser(raw) ?? [])
