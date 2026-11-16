@@ -30,6 +30,17 @@ describe("every option of the CRM commands runs against the fake account", () =>
       expect(await codeOf(account, argv), argv.join(" ")).toBe(0)
   })
 
+  it("changes list pages with --limit and --cursor, and prints a page as csv", async () => {
+    const { account } = await synced()
+    const first = await amo(["work", "changes", "list", "at>=3650d", "--limit", "1", "--json"], { account })
+    expect(first.code).toBe(0)
+    const next = (first.json().page as { next_cursor?: string } | undefined)?.next_cursor
+    expect(next).toEqual(expect.any(String))
+    const second = ["changes", "list", "at>=3650d", "--limit", "1", "--cursor", String(next)]
+    expect(await codeOf(account, second)).toBe(0)
+    expect(await codeOf(account, ["changes", "list", "--format", "csv"])).toBe(0)
+  })
+
   it("deal writes take every field amoCRM has, and refuse the ones it lacks before any request", async () => {
     const { account, ref } = await synced()
     const deal = ref(301)
