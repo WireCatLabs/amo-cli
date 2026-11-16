@@ -21,6 +21,8 @@ import { IDENTITY } from "./identity.js"
 export interface AmoEnvironment extends BaseEnvironment {
   fetch?: FetchLike
   sleep?: SleepLike
+  /** The clock the pace waits on; a test moves it with its `sleep`, so no wait is real. */
+  now?: () => number
   /** In place of the system browser; a test plays the browser and the relay page. */
   openBrowser?: (url: string) => Promise<void>
 }
@@ -101,8 +103,13 @@ export const transportFor = (command: Command, signIn: AmoAuth, events?: EventSi
     ...(environment.signal ? { signal: environment.signal } : {}),
     ...(environment.sleep ? { sleep: environment.sleep } : {}),
     ...(environment.deadline ? { deadline: environment.deadline } : {}),
+    ...(environment.now ? { now: environment.now } : {}),
     // amoCRM counts per integration and account: two profiles on one account share one pace.
-    pacer: new Pacer(pacePathFor(IDENTITY, `account-${new URL(signIn.origin).hostname}`, env), ACCOUNT_PACE),
+    pacer: new Pacer(
+      pacePathFor(IDENTITY, `account-${new URL(signIn.origin).hostname}`, env),
+      ACCOUNT_PACE,
+      environment.now,
+    ),
   })
 }
 

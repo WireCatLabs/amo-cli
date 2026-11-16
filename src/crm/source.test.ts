@@ -7,7 +7,12 @@ import { amoCrmWriter } from "./writer.js"
 
 const over = (options: FakeAmoOptions = {}, page?: number) => {
   const account = fakeAmo({ perSecond: 10_000, ...options })
-  const transport = new AmoTransport({ signIn: { origin: FAKE_ORIGIN, token: FAKE_TOKEN }, fetch: account.fetch })
+  const origin = options.host ? `https://${options.host}` : FAKE_ORIGIN
+  const transport = new AmoTransport({
+    signIn: { origin, token: FAKE_TOKEN },
+    fetch: account.fetch,
+    sleep: async () => {},
+  })
   const source = amoCrmSource(() => transport, page ? { page } : {})
   return { account, transport, source }
 }
@@ -129,6 +134,38 @@ describe("crmWriteContract", () => {
     expect(renamed).toMatchObject({ name: "Example Ltd", metadata: { "9201": { value: "x" } } })
   })
 
+  it("changes one part of a contact's name and keeps the rest of the contact", async () => {
+    const { account, transport, source } = over()
+    const writer = amoCrmWriter(() => transport, source)
+    const before = await source.get?.("person", "401")
+    const changed = await writer.update("person", "401", { firstName: "Ivan" }, { operationId: "a" })
+    expect(changed).toMatchObject({ firstName: "Ivan", lastName: "Person 1", name: "Ivan Person 1" })
+    expect({ ...changed, firstName: null, name: null, updatedAt: 0 }).toEqual({
+      ...before,
+      firstName: null,
+      name: null,
+      updatedAt: 0,
+    })
+    expect(account.data.contacts.find((one) => one.id === 401)?.name).toBe("Ivan Person 1")
+  })
+
+  it("keeps the kind of each phone it keeps, and gives a new one the work kind", async () => {
+    const { account, transport, source } = over()
+    const contact = account.data.contacts.find((one) => one.id === 401)
+    const phones = contact?.custom_fields_values?.find((one) => one.field_code === "PHONE")
+    if (!phones) throw new Error("seed")
+    phones.values = [{ value: "+7 900 000-00-00", enum_code: "MOB", enum_id: 2 } as never]
+    const writer = amoCrmWriter(() => transport, source)
+    await writer.update("person", "401", { phones: ["+7 900 000-00-00", "+7 911 111-11-11"] }, { operationId: "a" })
+    const kept = account.data.contacts
+      .find((one) => one.id === 401)
+      ?.custom_fields_values?.find((one) => one.field_code === "PHONE")
+    expect(kept?.values.map((one) => [one.value, one.enum_code])).toEqual([
+      ["+7 900 000-00-00", "MOB"],
+      ["+7 911 111-11-11", "WORK"],
+    ])
+  })
+
   it("makes a contact with its e-mail, and renames it keeping the rest", async () => {
     const { transport, source } = over()
     const writer = amoCrmWriter(() => transport, source)
@@ -235,5 +272,69 @@ describe("amoCrmSource", () => {
     const { transport } = over()
     const source = amoCrmSource(() => transport, { asked: async () => ({ mode: "all", setting: "s", chosen: "c" }) })
     await expect(source.self?.()).rejects.toMatchObject({ details: { reason: "amo.scope-all-refused" } })
+  })
+
+  it("keeps only the stage moves of the scope's deals", async () => {
+    const { account, source } = over()
+    const [first] = account.data.events
+    if (!first) throw new Error("seed")
+    account.data.events.push({ ...first, id: "01fakeevent0303", entity_id: 303 })
+    const page = await source.stageHistory?.("deal", 0, undefined, mine)
+    expect(page?.items.map((one) => one.item)).toEqual(["302", "302"])
+  })
+
+  it("goes on reading stage history where a spent budget cut it", async () => {
+    const { account, source } = over()
+    const [first] = account.data.events
+    if (!first) throw new Error("seed")
+    for (let at = 0; at < 250; at++)
+      account.data.events.push({ ...first, id: `01fakemove${at}`, created_at: first.created_at + 10 + at })
+    let left = 1
+    const spent = new Error("budget")
+    const tight = {
+      ...mine,
+      spend: () => {
+        if (left-- <= 0) throw spent
+      },
+    }
+    const items: string[] = []
+    let after: string | undefined
+    for (let call = 0; call < 20; call++) {
+      left = 1
+      // A call that read nothing before the budget ran out stops the run, as core's sync does; the next run goes on.
+      const page = await source.stageHistory?.("deal", 0, after, tight).catch((error: unknown) => {
+        if (error !== spent) throw error
+        return null
+      })
+      if (page === null) continue
+      if (!page) throw new Error("no history")
+      items.push(...page.items.map((one) => one.externalId))
+      after = page.hasMore ? page.nextCursor : undefined
+      if (!page.hasMore) break
+    }
+    expect(new Set(items).size).toBe(252)
+  })
+
+  it.each([
+    ["wirecatfake.amocrm.ru", "filter[type][]"],
+    ["wirecatfake.kommo.com", "filter[type]"],
+  ])("names the event types on %s as %s", async (host, name) => {
+    const { account, source } = over({ host })
+    await source.stageHistory?.("deal", 0)
+    const read = account.calls.find((one) => one.path === "/api/v4/events")
+    expect(Object.keys(read?.query ?? {})).toContain(name)
+  })
+
+  it("lists by an exact time to the second it names", async () => {
+    const { account, source } = over()
+    await source.list?.("person", {
+      conditions: [{ field: "updated_at", op: "=", value: 1_767_312_000_500 }],
+      limit: 5,
+    } as never)
+    const read = account.calls.find((one) => one.path === "/api/v4/contacts")
+    expect(read?.query).toMatchObject({
+      "filter[updated_at][from]": ["1767312000"],
+      "filter[updated_at][to]": ["1767312000"],
+    })
   })
 })

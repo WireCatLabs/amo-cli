@@ -103,19 +103,33 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
     return fields
   }
 
-  const personOf = async (given: CrmPersonFields): Promise<Raw> => {
+  /** On update the contact as amoCRM holds it now: the name part not given, and the kinds of the numbers kept. */
+  const personOf = async (given: CrmPersonFields, externalId?: string): Promise<Raw> => {
     refuseStandard(given.custom)
     if (given.owner === null) throw refused("an amoCRM contact is always assigned to a user", "--owner")
     if (given.position !== undefined)
       throw refused("amoCRM keeps a job title in an account's own field; set it with --field", "--position")
+    const naming = given.name === undefined && (given.firstName !== undefined || given.lastName !== undefined)
+    const current =
+      externalId !== undefined && (naming || given.emails || given.phones)
+        ? await source.get?.("person", externalId)
+        : undefined
     const fields: Raw = {}
-    const name = given.name ?? crmValues.fullName(given.firstName, given.lastName)
+    const name =
+      given.name ??
+      (naming
+        ? crmValues.fullName(
+            given.firstName === undefined ? current?.firstName : given.firstName,
+            given.lastName === undefined ? current?.lastName : given.lastName,
+          )
+        : undefined)
     if (name != null) fields.name = name
     if (given.firstName !== undefined) fields.first_name = given.firstName ?? ""
     if (given.lastName !== undefined) fields.last_name = given.lastName ?? ""
     if (given.owner != null) fields.responsible_user_id = numericId(given.owner, "--owner")
     const defined = given.emails || given.phones || given.custom ? await source.fields("person") : []
     const values = given.custom ? customValuesOf(defined, given.custom) : []
+    const kinds = current?.contactTypes ?? {}
     for (const [holds, list] of [
       ["email", given.emails],
       ["phone", given.phones],
@@ -123,10 +137,10 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
       if (list === undefined) continue
       const field = defined.find((one) => one.holds === holds)
       if (!field) throw refused(`this account has no ${holds} field on contacts`)
-      // contacts-api's PATCH example sends each number with `enum_code: "WORK"`.
+      // A number kept keeps its kind (MOB, HOME…); a new one is WORK, as contacts-api's PATCH example sends it.
       values.push({
         field_id: Number(field.code),
-        values: list.map((value) => ({ value, enum_code: "WORK" })) as never,
+        values: list.map((value) => ({ value, enum_code: kinds[value] ?? "WORK" })) as never,
       })
     }
     if (values.length) fields.custom_fields_values = values
@@ -144,9 +158,9 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
     return fields
   }
 
-  const bodyOf = (kind: CrmKind, given: unknown, create: boolean): Promise<Raw> => {
+  const bodyOf = (kind: CrmKind, given: unknown, create: boolean, externalId?: string): Promise<Raw> => {
     if (kind === "deal") return dealOf(given as CrmFields, create)
-    if (kind === "person") return personOf(given as CrmPersonFields)
+    if (kind === "person") return personOf(given as CrmPersonFields, create ? undefined : externalId)
     if (kind === "organization") return organizationOf(given as CrmOrganizationFields)
     throw new CliError("validation_error", "amoCRM has no leads apart from its deals", {
       reason: "crm.write-unsupported",
@@ -202,7 +216,7 @@ export const amoCrmWriter = (account: () => AmoTransport, source: AmoCrmSource):
       return readBack(kind, externalId, options)
     },
     async update(kind, externalId, patch, options) {
-      return update(kind, externalId, await bodyOf(kind, patch, false), options)
+      return update(kind, externalId, await bodyOf(kind, patch, false, externalId), options)
     },
     async move(_kind, externalId, stage, options) {
       const { pipeline } = await stageOf(externalId)
