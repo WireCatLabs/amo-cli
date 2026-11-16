@@ -186,8 +186,8 @@ More: [WireCat](https://wirecat.dev)
 - **A copy of your share of the CRM.** `sync` copies the pipelines, the deals assigned to you and only the contacts and
   companies on them. An administrator can choose colleagues too. No sync copies the whole CRM.
 - **Staying current.** `amo work schedule command crm --every 1h -- sync` keeps the copy fresh with a timer.
-- **Polite to amoCRM.** amoCRM allows 7 requests a second per integration. `amo` keeps to 5 a second for every `amo`
-  process on the account, and waits out a short refusal.
+- **Polite to amoCRM.** `amo` keeps to 5 requests a second for every `amo` process on the account, under amoCRM's
+  limit, and waits out a short refusal.
 - **No double writes.** When the answer to a write is lost, `amo` does not send it again. It reports the outcome as
   unknown, so you check the record first.
 - **Made for scripts.** `--json` prints one JSON value, and every error has a code to branch on.
