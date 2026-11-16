@@ -1,7 +1,16 @@
+import { memoryKeyring } from "@wirecat/cli-base"
 import { describe, expect, it } from "vitest"
 import { openAmoStore } from "../store.js"
-import { FAKE_COLLEAGUE_ID, FAKE_HOST, type FakeAmo, type FakeAmoOptions, fakeAmo } from "../testing/fake-amo.js"
-import { amo } from "../testing/harness.js"
+import {
+  FAKE_COLLEAGUE_ID,
+  FAKE_HOST,
+  FAKE_ORIGIN,
+  FAKE_TOKEN,
+  type FakeAmo,
+  type FakeAmoOptions,
+  fakeAmo,
+} from "../testing/fake-amo.js"
+import { amo, FAKE_SIGN_IN } from "../testing/harness.js"
 
 const account = (options: FakeAmoOptions = {}) => fakeAmo({ perSecond: 10_000, ...options })
 
@@ -106,6 +115,35 @@ describe("sync", () => {
     const deals = await listed(fake, ["deals", "list"])
     expect(idsOf(deals)).toEqual(["301", "302"])
     expect(deals.items.find((one) => one.external_id === "301")).toMatchObject({ title: "Test lead renamed" })
+  })
+})
+
+describe("a colleague's profile on the same account", () => {
+  it("reads offline only its own user's deals of the administrator's copy, and search finds none of the rest", async () => {
+    const keyring = memoryKeyring({
+      "amo-cli:token:work": FAKE_SIGN_IN,
+      "amo-cli:token:home": JSON.stringify({
+        origin: FAKE_ORIGIN,
+        token: FAKE_TOKEN,
+        userId: String(FAKE_COLLEAGUE_ID),
+      }),
+    })
+    const fake = account()
+    expect((await amo(["work", "sync", "--json"], { account: fake, keyring })).code).toBe(0)
+    const as = async (profile: string, args: string[]) => {
+      const ran = await amo([profile, ...args, "--offline", "--json"], { account: fake, keyring })
+      return { ran, items: ran.code === 0 ? (ran.json().items as Record<string, unknown>[]) : [] }
+    }
+    const admin = await as("work", ["deals", "list"])
+    expect(admin.items.length).toBeGreaterThan(0)
+    const colleague = await as("home", ["deals", "list"])
+    expect(colleague.ran.code).toBe(0)
+    expect(colleague.items).toEqual([])
+    const ref = String(admin.items[0]?.ref)
+    expect((await as("home", ["deals", "show", ref])).ran.json()).toMatchObject({ error: { code: "not_found" } })
+    expect((await as("work", ["search", "all", "Test lead"])).items.length).toBeGreaterThan(0)
+    const searched = await as("home", ["search", "all", "Test lead"])
+    expect([searched.ran.code, searched.items]).toEqual([0, []])
   })
 })
 

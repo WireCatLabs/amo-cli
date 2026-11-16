@@ -288,30 +288,23 @@ the main pipeline").
 - A later round re-reads every client of a changed lead (see the store and sync).
 - A company given to a colleague or taken off every chosen deal stays in the copy: cli-core has no cleanup pass for
   companies when the source names its deletions itself.
-- Two profiles on one account share its copy, which is keyed by the host. A non-administrator's profile reads, offline,
-  the deals an administrator's profile copied, and `search all` finds them by their contacts' e-mails (checked on the
-  fake, 2026-11-16). Phones are not printed offline. b24 does the same; the reads are cli-core's, so a fix (reads
-  limited to the copy's own user) is cli-core's.
+- Two profiles on one account share its copy, which is keyed by the host. Each run names its sign-in's user
+  (`user` in `openProfile`, `src/commands/crm-shared.ts`, read from the saved sign-in with no network; `null` for
+  `AMO_TOKEN`), so a non-administrator's profile reads offline only its own user's deals, and `search all` finds none
+  of the rest (cli-core 0.676.0; test "a colleague's profile on the same account").
 - Live checks:
   - the `filter[type]` form on a `.amocrm.ru` account;
   - one `GET /api/v4/events?filter[type][]=lead_status_changed`, to see whether events come newest or oldest first;
   - one by-id read of a deleted lead: 204, or a record with `is_deleted`;
   - `mode=post_message`, a refresh after 24 hours, and the answer of an account without the add-on.
-- The Desktop setup flow (`src/setup/flow.ts`, texts in `src/setup/texts.*.json`) is defined and tested but not
-  mounted. cli-core 0.675.0's `setup apply` keeps the bare token and remembers the profile's name, which amo's
-  sign-in cannot read, and prints whatever the check returns. The check returns `keep` (the sign-in with the address
-  and user, and `<host>:<user>`), which [cli-core#3005](https://github.com/WireCatLabs/cli-core/pull/3005) honours.
-  Mount `setupCommand(amoSetup)` in `program.ts` at the bump that carries it, with an apply → `session status
-  --check` round-trip test and `cli-dev lint` over the setup group. No image blocks until the screenshots exist.
-- `session start` does not write the `host` setting: editing a terminal-made profile in Desktop starts with an empty
-  address, and a profile moved with `session start` keeps a stale `host` that makes an edit without a token fail with
-  `account.token-missing`. One `changeSetting` in `session start`, with the mount.
+- The Desktop setup flow (`src/setup/flow.ts`, texts in `src/setup/texts.*.json`) asks for the address and a
+  long-lived token. Its check is `session start`'s (`checkedToken`) and returns `keep`, so `setup apply` keeps the same
+  sign-in as `session start` (the address and user beside the token). Both keep the `host` setting the flow shows. No
+  image blocks until the screenshots exist.
 - Desktop shows links only to wirecat.dev, github.com/WireCatLabs and the catalog entry's domains: amoCRM's guide
   links in the setup texts are plain text unless amo's catalog entry lists amocrm.ru.
 - The checkbox «Доступ к данным аккаунта» comes from the README; amoCRM's step-by-step page names only the group
   «Предоставить доступ». Confirm on the live form.
-- At the next cli-core bump: #2997's CRM changes (breaking) are on main, and the SEC-197 change will need `user:
-  signInOf(command).userId` in the CrmRun built in `openProfile` (`src/commands/crm-shared.ts`).
 - How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
 - The event types `contact_deleted`, `company_deleted` and their `_restored` follow the `lead_deleted` pattern; no
   live answer has been seen.

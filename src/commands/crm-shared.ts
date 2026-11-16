@@ -11,6 +11,15 @@ import { AMO_WRITES } from "../crm/writer.js"
 import { IDENTITY } from "../identity.js"
 
 /** The selected profile's account for one command; cli-core closes the store before the answer prints. */
+/** A sign-in that cannot be read limits the reads to nobody's deals; the request that needs it says why. */
+const userOf = (command: Command): string | null => {
+  try {
+    return storedSignIn(command)?.userId ?? null
+  } catch {
+    return null
+  }
+}
+
 const openProfile = async (command: Command, { readOnly }: { readOnly: boolean }): Promise<CrmRun> => {
   const { env, profile } = contextOf(command)
   const [{ openAmoStore, PROVIDER }, { amoCrmSource }, { amoCrmWriter }] = await Promise.all([
@@ -47,6 +56,8 @@ const openProfile = async (command: Command, { readOnly }: { readOnly: boolean }
   return {
     profile,
     account,
+    // From the saved sign-in, so an offline read needs no network; AMO_TOKEN names no user.
+    user: userOf(command),
     store,
     env,
     locked: Boolean(env[`${IDENTITY.envPrefix}_PROFILE_LOCK`]),

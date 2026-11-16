@@ -99,6 +99,12 @@ export const checkedToken = async (command: Command, origin: string, token: stri
   }
 }
 
+/** The setup flow shows and checks the address from this setting, so both ways of signing in keep it. */
+const keepHost = (command: Command, origin: string) => {
+  const { profile, settings } = contextOf(command)
+  configuration.changeSetting(settings.configPath, { profile, setting: "host", value: JSON.stringify(origin) })
+}
+
 const PASTE = "If the browser did not come back here, paste the address it ended on: "
 
 interface StartArgs {
@@ -170,6 +176,7 @@ const startWithApp = async (command: Command, args: StartArgs, origin: string) =
     }),
   )
   tokens.remove(profile)
+  keepHost(command, origin)
   rememberAccount(IDENTITY, profile, `${who.account}:${who.user.id}`, env)
   const { id: _id, ...found } = who
   return {
@@ -231,6 +238,7 @@ const startCommand = () =>
       if (!token) throw new CliError("validation_error", "no token was given")
       const { who, signIn, account } = await checkedToken(this, origin, token)
       const storedIn = tokens.write(profile, signIn, args.credentialStorage)
+      keepHost(this, origin)
       appStorage(env, profile, keyring).remove()
       rememberAccount(IDENTITY, profile, account, env)
       answer(this, { profile, state: "saved", kind: "token", stored_in: storedIn, verified: true, ...who })

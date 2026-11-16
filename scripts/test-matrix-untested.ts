@@ -30,6 +30,12 @@ export const UNTESTED: { command: string; option?: string; reason: string }[] = 
     { command: "schedule resume" },
     { command: "schedule agents list" },
   ].map((one) => ({ ...one, reason: SHARED_SCHEDULE })),
+  {
+    command: "setup",
+    reason:
+      "cli-core's setupCommand asks the flow's questions in a terminal; its setup-command tests drive that, and " +
+      "src/setup/flow.test.ts runs this flow through setup apply and setup run apply",
+  },
   { command: "store status", reason: SHARED_STORE },
   { command: "store info", reason: SHARED_STORE },
   { command: "store check", reason: SHARED_STORE },

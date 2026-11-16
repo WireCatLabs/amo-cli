@@ -8,7 +8,10 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
 - Started from `@wirecat/cli-template` 0.24.0.
 - A `host` profile setting and the WireCat Desktop setup flow for a long-lived token, in English, Russian and Spanish
-  (`src/setup/`); it is mounted once cli-core keeps amo's own sign-in from a flow.
+  (`amo setup`, `src/setup/`); `session start` keeps `host` too.
+- On cli-core 0.676.0: a profile reads offline only its own user's deals of a copy another profile on the same account
+  made (the administrator's reads stay whole), `organizations create|update --email|--phone` write the company's own
+  fields or refuse when the account has none, and `pipelines show --since-time|--until-time` answer a period funnel.
 - `session start --host <address>` signs in to an amoCRM or Kommo account with a long-lived token, read hidden or from
   stdin and kept in the keyring with the address; `session status --check` shows the account and the user.
 - `api list`, `api show` and `api call` reach every operation of the amoCRM API v4 reference, each with its own

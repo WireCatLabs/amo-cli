@@ -7,7 +7,7 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**159 ✅ · 64 ⛔ · 0 ❌** — 80 commands, 143 options.
+**174 ✅ · 65 ⛔ · 0 ❌** — 84 commands, 155 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
@@ -77,6 +77,8 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `deals close` | `--reason` | ✅ |  |
 | `pipelines list` |  | ✅ |  |
 | `pipelines show` |  | ✅ |  |
+| `pipelines show` | `--since-time` | ✅ |  |
+| `pipelines show` | `--until-time` | ✅ |  |
 | `stages list` |  | ✅ |  |
 | `people list` |  | ✅ |  |
 | `people list` | `--limit` | ✅ |  |
@@ -88,6 +90,8 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `people create` | `--first-name` | ✅ |  |
 | `people create` | `--last-name` | ✅ |  |
 | `people create` | `--position` | ✅ |  |
+| `people create` | `--email` | ✅ |  |
+| `people create` | `--phone` | ✅ |  |
 | `people create` | `--owner` | ✅ |  |
 | `people create` | `--field` | ✅ |  |
 | `people update` |  | ✅ |  |
@@ -95,6 +99,8 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `people update` | `--first-name` | ✅ |  |
 | `people update` | `--last-name` | ✅ |  |
 | `people update` | `--position` | ✅ |  |
+| `people update` | `--email` | ✅ |  |
+| `people update` | `--phone` | ✅ |  |
 | `people update` | `--owner` | ✅ |  |
 | `people update` | `--field` | ✅ |  |
 | `organizations list` |  | ✅ |  |
@@ -104,10 +110,14 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `organizations show` |  | ✅ |  |
 | `organizations create` |  | ✅ |  |
 | `organizations create` | `--name` | ✅ |  |
+| `organizations create` | `--email` | ✅ |  |
+| `organizations create` | `--phone` | ✅ |  |
 | `organizations create` | `--owner` | ✅ |  |
 | `organizations create` | `--field` | ✅ |  |
 | `organizations update` |  | ✅ |  |
 | `organizations update` | `--name` | ✅ |  |
+| `organizations update` | `--email` | ✅ |  |
+| `organizations update` | `--phone` | ✅ |  |
 | `organizations update` | `--owner` | ✅ |  |
 | `organizations update` | `--field` | ✅ |  |
 | `users list` |  | ✅ |  |
@@ -207,6 +217,12 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `config migrate` |  | ✅ |  |
 | `config repair` |  | ✅ |  |
 | `config repair` | `--dry-run` | ✅ |  |
+| `setup` |  | ⛔ | cli-core's setupCommand asks the flow's questions in a terminal; its setup-command tests drive that, and src/setup/flow.test.ts runs this flow through setup apply and setup run apply |
+| `setup show` |  | ✅ |  |
+| `setup apply` |  | ✅ |  |
+| `setup apply` | `--dry-run` | ✅ |  |
+| `setup run` |  | ✅ |  |
+| `setup run` | `--answer-stdin` | ✅ |  |
 | `runs list` |  | ✅ |  |
 | `runs list` | `--limit` | ✅ |  |
 | `runs list` | `--page` | ✅ |  |
