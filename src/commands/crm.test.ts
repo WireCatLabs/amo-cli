@@ -95,12 +95,14 @@ describe("sync", () => {
     if (!lead) throw new Error("seed")
     lead.name = "Test lead renamed"
     lead.updated_at = Math.floor(now / 1000) + 5
-    fake.remove("lead", 304, Math.floor(now / 1000) + 5)
+    // Before the round starts: an event dated after its start is the next round's.
+    fake.remove("lead", 304, Math.floor(now / 1000))
     const before = fake.calls.length
     await sync(fake)
     const second = fake.calls.slice(before)
     expect(second.some((one) => one.query["filter[updated_at][from]"] !== undefined)).toBe(true)
-    expect(second.some((one) => one.query["filter[type][]"]?.join() === "lead_deleted,lead_restored")).toBe(true)
+    const types = second.map((one) => one.query["filter[type][]"]?.join())
+    expect(types).toEqual(expect.arrayContaining(["lead_deleted", "lead_restored"]))
     const deals = await listed(fake, ["deals", "list"])
     expect(idsOf(deals)).toEqual(["301", "302"])
     expect(deals.items.find((one) => one.external_id === "301")).toMatchObject({ title: "Test lead renamed" })
@@ -265,16 +267,22 @@ describe("sync in small runs", () => {
     expect(state).toBe("complete")
   }, 60_000)
 
-  it("drops a contact given to a colleague and off every chosen deal at the next rescan", async () => {
+  it("never stores a colleague's changed contact that is on none of the chosen deals", async () => {
     const fake = account()
     await sync(fake)
     const before = await people()
-    const contact = fake.data.contacts.find((one) => one.id === 402)
+    const [contact] = fake.data.contacts
     if (!contact) throw new Error("seed")
-    for (const one of fake.data.leads) one.contacts = one.contacts.filter((id) => id !== 402)
-    Object.assign(contact, { responsible_user_id: FAKE_COLLEAGUE_ID, updated_at: Math.floor(Date.now() / 1000) + 5 })
+    fake.data.contacts.push({
+      ...contact,
+      id: 699,
+      name: "Colleague Only Client",
+      responsible_user_id: FAKE_COLLEAGUE_ID,
+      companies: [501],
+      updated_at: Math.floor(Date.now() / 1000) + 5,
+    })
     await sync(fake)
-    expect((await amo(["work", "sync", "--rescan", "--json"], { account: fake })).code).toBe(0)
-    expect(await people()).toBe(before - 1)
+    await sync(fake)
+    expect(await people()).toBe(before)
   })
 })
