@@ -12,6 +12,10 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 - On cli-core 0.676.0: a profile reads offline only its own user's deals of a copy another profile on the same account
   made (the administrator's reads stay whole), `organizations create|update --email|--phone` write the company's own
   fields or refuse when the account has none, and `pipelines show --since-time|--until-time` answer a period funnel.
+- With `config set crm.amocrm:<host>.activities on`, `sync` copies the tasks, comments and calls on your deals and
+  their clients (90 days back at first); `activities list` lists them, `changes list` shows what changed, and
+  `schedule command crm-digest --at 08:30 -- changes list --format report` sends a morning digest. A call keeps no
+  phone number or recording, and the digest prints no note text.
 - `session start --host <address>` signs in to an amoCRM or Kommo account with a long-lived token, read hidden or from
   stdin and kept in the keyring with the address; `session status --check` shows the account and the user.
 - `api list`, `api show` and `api call` reach every operation of the amoCRM API v4 reference, each with its own

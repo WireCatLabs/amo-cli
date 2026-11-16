@@ -12,7 +12,7 @@ const LONG_RUNNING = `starts an HTTP server or a background process that runs un
 
 export const UNTESTED: { command: string; option?: string; reason: string }[] = [
   ...[
-    ...["--at", "--at-time", "--notify-on", "--deliver-to"].map((option) => ({ command: "schedule command", option })),
+    ...["--at-time", "--notify-on", "--deliver-to"].map((option) => ({ command: "schedule command", option })),
     { command: "schedule agent" },
     ...[
       "--model",

@@ -541,6 +541,19 @@
     },
     {
       "path": [
+        "activities",
+        "list"
+      ],
+      "summary": "activities copied from the CRM, open ones first by due time, then the rest…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "activities.list",
+      "entity": "crm_activity"
+    },
+    {
+      "path": [
         "changes",
         "list"
       ],
@@ -1089,6 +1102,12 @@
         "position",
         "active",
         "department_ids"
+      ]
+    },
+    "crm_activity": {
+      "fields": [
+        "status",
+        "kind"
       ]
     },
     "crm_change": {

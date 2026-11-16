@@ -16,6 +16,7 @@ describe("every option of the CRM commands runs against the fake account", () =>
       ["pipelines", "show", "Продажи"],
       ["pipelines", "show", "Продажи", "--since-time", "2026-01-01", "--until-time", "2026-12-31"],
       ["stages", "list", "kind:deal"],
+      ["activities", "list", "status:done", "--limit", "1", "--page", "2"],
       ["people", "list", "--limit", "1", "--page", "2"],
       ["people", "list", "--format", "csv"],
       ["organizations", "list", "--limit", "1", "--page", "1"],

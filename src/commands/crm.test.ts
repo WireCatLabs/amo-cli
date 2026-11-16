@@ -324,3 +324,80 @@ describe("sync in small runs", () => {
     expect(await people()).toBe(before)
   })
 })
+
+describe("activities, changes and the digest", () => {
+  const SETTING = "crm.amocrm:wirecatfake.amocrm.ru.activities"
+  const touched = (fake: FakeAmo) =>
+    fake.calls.filter((one) => one.path === "/api/v4/tasks" || one.path.endsWith("/notes")).length
+  const activitiesOn = async (fake: FakeAmo, keyring?: ReturnType<typeof memoryKeyring>) => {
+    const set = await amo(["work", "config", "set", SETTING, "on", "--json"], {
+      account: fake,
+      ...(keyring ? { keyring } : {}),
+    })
+    expect(set.code, set.err).toBe(0)
+  }
+
+  it("reads no task or note while the activities setting is off, as it is by default", async () => {
+    const fake = account()
+    await sync(fake)
+    expect(touched(fake)).toBe(0)
+    const ran = await amo(["work", "activities", "list", "--json"], { account: fake })
+    expect(ran.code, ran.err).toBe(0)
+    expect(ran.json()).toMatchObject({ items: [], missing: [expect.objectContaining({ field: "activities" })] })
+  })
+
+  it("stores the tasks and notes on the user's deals and their clients, and none on a colleague's", async () => {
+    const fake = account()
+    await activitiesOn(fake)
+    await sync(fake)
+    expect(touched(fake)).toBeGreaterThan(0)
+    const open = await listed(fake, ["activities", "list"])
+    const done = await listed(fake, ["activities", "list", "status:done"])
+    expect([...idsOf(open), ...idsOf(done)].sort()).toEqual([
+      "note:contacts:711",
+      "note:leads:701",
+      "note:leads:702",
+      "task:601",
+      "task:603",
+    ])
+    const text = JSON.stringify([open, done])
+    expect(text).not.toMatch(/Colleague's|000-00-01|record\.mp3/)
+  })
+
+  it("prints the digest report with an overdue task, and no note text, phone or e-mail", async () => {
+    const fake = account()
+    const [task] = fake.data.tasks
+    if (!task) throw new Error("seed")
+    task.complete_till = Math.floor(Date.now() / 1000) - 86400
+    task.text = "Call back +7 900 000-00-01 about the offer"
+    await activitiesOn(fake)
+    await sync(fake)
+    const ran = await amo(["work", "changes", "list", "--format", "report"], { account: fake })
+    expect(ran.code, ran.err).toBe(0)
+    const report = JSON.parse(ran.out) as { format: string; sections: { kind: string }[] }
+    expect(report.format).toBe("wirecat.report/1")
+    expect(report.sections.map((one) => one.kind)).toEqual(["crm"])
+    expect(ran.out).toContain("Call back")
+    expect(ran.out).toContain("about the offer")
+    expect(ran.out).not.toMatch(/Discussed the price|Prefers mornings|\+7 900|@example\.test|record\.mp3/)
+  })
+
+  it("shows a colleague's profile none of the activities on the administrator's deals", async () => {
+    const keyring = memoryKeyring({
+      "amo-cli:token:work": FAKE_SIGN_IN,
+      "amo-cli:token:home": JSON.stringify({
+        origin: FAKE_ORIGIN,
+        token: FAKE_TOKEN,
+        userId: String(FAKE_COLLEAGUE_ID),
+      }),
+    })
+    const fake = account()
+    await activitiesOn(fake, keyring)
+    expect((await amo(["work", "sync", "--json"], { account: fake, keyring })).code).toBe(0)
+    for (const query of [[], ["status:done"]]) {
+      const ran = await amo(["home", "activities", "list", ...query, "--offline", "--json"], { account: fake, keyring })
+      expect(ran.code, ran.err).toBe(0)
+      expect(ran.json().items).toEqual([])
+    }
+  })
+})

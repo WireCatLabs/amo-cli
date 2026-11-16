@@ -13,6 +13,7 @@ import {
 import { matchOperation } from "../amo/operation.js"
 import { type AmoKind, ENTITIES, ROUTES, type Route } from "../amo/routes.js"
 import type { AmoRequest, AmoTransport, QueryValue } from "../amo/transport.js"
+import { readActivities } from "./activities.js"
 import { fieldOfRaw, type Raw, toDeal, toOrganization, toPerson, toPipeline, toUser } from "./records.js"
 
 const { fieldOf, id, isRaw, rawsOf, text } = crmValues
@@ -625,6 +626,15 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
         if (`${at.p}.${at.o}` === start) throw caller.spent()
         return answer(false)
       }
+    },
+    // Read only when the account's activities setting is on; core keeps those on the deals and clients the copy holds.
+    activities(since, page, context) {
+      const caller = metered(context)
+      return readActivities(
+        (route, name, query) => listPage(caller, route, name, query),
+        { since, now: now(), size, ...(page === undefined ? {} : { page }) },
+        context,
+      )
     },
     async users(context) {
       return (await readAll(metered(context), ROUTES.users, "users")).flatMap((raw) => toUser(raw) ?? [])

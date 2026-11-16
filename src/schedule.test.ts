@@ -67,6 +67,19 @@ describe("amo schedule", () => {
     ])
   })
 
+  it("installs the CRM morning digest as a daily command schedule of changes list --format report", async () => {
+    const { amo, root } = harness()
+    const argv = ["changes", "list", "--format", "report"]
+    const added = await amo("work", "schedule", "command", "crm-digest", "--at", "08:00", "--", ...argv)
+    expect(added.code, added.err).toBe(0)
+    const file = join(root, "state", "schedules", "crm-digest", "schedule.json")
+    expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({
+      kind: "command",
+      argv,
+      environment: { AMO_PROFILE: "work" },
+    })
+  })
+
   it("lists the sync schedule, then removes it and its timer", async () => {
     const { amo, ran } = harness()
     await amo("work", "schedule", "command", "crm", "--every", "1h", "--", "sync")

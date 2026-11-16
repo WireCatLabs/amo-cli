@@ -92,6 +92,19 @@ amoCRM has no call that revokes a token: revoke it on the integration's «Клю
 `--delete-data` also deletes the account's copy from the store, and refuses while another profile reads the same
 account. `amo work schedule command crm --every 1h -- sync` keeps the copy fresh with a timer.
 
+Tasks and notes are off by default. `amo work config set crm.amocrm:<host>.activities on` makes the next `sync` copy
+the tasks, comments and calls on your deals and their clients from the last 90 days; those on a colleague's deal are
+never stored, and a call keeps only its direction, never the phone number or the recording. `activities list` shows
+them, and `changes list` shows what changed: deals made, moved, won, lost and given another owner, tasks added and
+done, contacts added. A morning digest of the last day goes to the desktop notice, or to a chat with `--deliver-to`:
+
+```sh
+amo work schedule command crm-digest --at 08:30 -- changes list --format report
+```
+
+The digest names deal titles, amounts, contact names and task subjects, never a note's text; phone numbers and e-mail
+addresses in it are masked. Everyone who reads the route reads it.
+
 ## Settings and permissions
 
 Each profile has a permission level for every operation: `allow`, `ask`, `readonly` or `deny`. Its key is the path's

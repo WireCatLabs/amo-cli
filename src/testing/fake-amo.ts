@@ -2,6 +2,7 @@ import { LIMITS, WITH_VALUES } from "../amo/allow-list.js"
 import { isRecord, type Json } from "../amo/json.js"
 import { RELAY_URL } from "../amo/oauth.js"
 import { matchOperation, type Operation } from "../amo/operation.js"
+import { activitiesSeed, activityHandlers } from "./fake-activities.js"
 import { bodyProblems, declaredParameter, parameterProblem } from "./spec-check.js"
 
 /*
@@ -208,7 +209,7 @@ export interface FakeEvent {
 }
 
 /** Synthetic: a ru account with two pipelines, each with its unsorted (type 1), regular, won (142) and lost (143). */
-export const seed = () => {
+export const seed = (recent: number) => {
   const pipelines = [5001, 5002].map((id, at) => ({
     id,
     name: at === 0 ? "Продажи" : "Партнёры",
@@ -387,6 +388,7 @@ export const seed = () => {
       ),
       event("01fakeevent0003", "lead_added", 301, "lead", SEED_TIME + 3000),
     ] as FakeEvent[],
+    ...activitiesSeed(recent, FAKE_USER_ID, FAKE_COLLEAGUE_ID),
     customFields: {
       contacts: [PHONE, EMAIL, NOTE],
       leads: [SOURCE],
@@ -725,18 +727,22 @@ const handlersFor = (data: Data, options: FakeAmoOptions, now: () => number): Re
       )
       return page(call, "events", all, href("/api/v4/events"))
     },
+    ...activityHandlers(data, { href, page, valuesOf }),
   }
 }
 
-/** What `filter[…]` needs: the account's API filter add-on, on leads, contacts and companies (filters-api). */
-const FILTERED = new Set(["leads", "contacts", "companies"])
+/**
+ * What `filter[…]` needs: the account's API filter add-on, on the lead, contact and company lists (filters-api). Tasks
+ * and notes document their own filters on their own pages, so they are taken as open without it (research §6, inferred).
+ */
+const FILTERED = new Set(["/api/v4/leads", "/api/v4/contacts", "/api/v4/companies"])
 
 /** A query the operation does not declare, a value of the wrong type, a `with` no page names, a `limit` too big. */
 const queryRefusal = (operation: Operation, call: FakeCall, options: FakeAmoOptions): Response | undefined => {
   for (const [name, values] of Object.entries(call.query)) {
     const declared = declaredParameter(operation, name)
     if (declared === undefined) return invalid(name, `${operation.name} takes no ${name}`)
-    if (options.apiFilter === false && name.startsWith("filter[") && FILTERED.has(operation.family))
+    if (options.apiFilter === false && name.startsWith("filter[") && FILTERED.has(operation.template))
       return invalid(name, "API filters are an add-on this account does not have", "FilterDisabled")
     if (name === "with") {
       const allowed = WITH_VALUES[operation.name]?.values ?? []
@@ -818,11 +824,11 @@ const tokenEndpoint = (options: FakeAmoOptions, tokens: { access: Set<string>; r
 
 export const fakeAmo = (options: FakeAmoOptions = {}) => {
   const host = options.host ?? FAKE_HOST
-  const data = seed()
+  const now = options.now ?? Date.now
+  const data = seed(Math.floor(now() / 1000) - 3600)
   if (options.currency) data.account.currency = options.currency
   const calls: FakeCall[] = []
   const sent: number[] = []
-  const now = options.now ?? Date.now
   let loseNext = options.loseNextWrite === true
   const handlers = { ...handlersFor(data, options, now), ...options.routes }
   const tokens = { access: new Set([FAKE_TOKEN]), refresh: "", issued: 0 }

@@ -81,7 +81,8 @@ const openProfile = async (command: Command, { readOnly }: { readOnly: boolean }
 
 /**
  * cli-core's shared CRM commands over the account: `sync`, `store status`, `deals`, `pipelines`, `stages`, `fields`,
- * and `people`, `organizations` and `users` read live. amoCRM has no leads apart from its deals.
+ * `activities` and `changes`, and `people`, `organizations` and `users` read live. amoCRM has no leads apart from its
+ * deals.
  */
 export const crmSharedCommands = (): Command[] => {
   const holder = new Command(IDENTITY.command)
@@ -91,6 +92,7 @@ export const crmSharedCommands = (): Command[] => {
     leads: false,
     writes: AMO_WRITES,
     live: ["person", "organization", "user"],
+    activities: true,
   })
   return [...holder.commands]
 }

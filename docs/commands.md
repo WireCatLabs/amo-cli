@@ -821,6 +821,31 @@ amo users show <user>
 
 **Example:** `amo work users show 7`
 
+## `amo activities`
+
+the CRM's activities and tasks on deals, leads, contacts and companies, as last synced
+
+### `amo activities list`
+
+activities copied from the CRM, open ones first by due time, then the rest newest first; status:open unless a status is given; the activities setting must be on
+
+```sh
+amo activities list [query] [options]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `query` | optional | field:value terms that narrow the list — the fields are below. |
+
+| Option | What it does |
+|---|---|
+| `--limit <n>` | activities per page, 1–500. Default: `50`. |
+| `--page <n>` | which page, starting at 1. Default: `1`. |
+
+**Returns:** crm activity — external_id, kind, subject, body, due_at, done, done_at, assignee, and 4 more; every field: amo commands info activities list
+
+**Example:** `amo work activities list overdue:true`, `amo work activities list due:today --json`, `amo work activities list deal:12 status:done`
+
 ## `amo changes`
 
 what changed in the CRM's deals, leads, activities and contacts, as the syncs copied it

@@ -7,7 +7,7 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**178 ✅ · 65 ⛔ · 0 ❌** — 85 commands, 158 options.
+**182 ✅ · 64 ⛔ · 0 ❌** — 86 commands, 160 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
@@ -124,6 +124,9 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `users list` | `--limit` | ✅ |  |
 | `users list` | `--page` | ✅ |  |
 | `users show` |  | ✅ |  |
+| `activities list` |  | ✅ |  |
+| `activities list` | `--limit` | ✅ |  |
+| `activities list` | `--page` | ✅ |  |
 | `changes list` |  | ✅ |  |
 | `changes list` | `--limit` | ✅ |  |
 | `changes list` | `--cursor` | ✅ |  |
@@ -147,7 +150,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `api call` | `--dry-run` | ✅ |  |
 | `schedule command` |  | ✅ |  |
 | `schedule command` | `--every` | ✅ |  |
-| `schedule command` | `--at` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule command` | `--at` | ✅ |  |
 | `schedule command` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule command` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule command` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |

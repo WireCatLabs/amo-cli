@@ -102,7 +102,7 @@ describe("the fake account refuses what amoCRM refuses", () => {
 
   it("answers a read it has no answer for with 501, never an empty list (FIND-2)", async () => {
     const account = fakeAmo()
-    for (const path of ["/api/v4/tasks", "/api/v4/leads/notes", "/api/v4/events/types"])
+    for (const path of ["/api/v4/leads/unsorted", "/api/v4/catalogs", "/api/v4/events/types"])
       expect([path, (await get(account, path)).status]).toEqual([path, 501])
     const added = fakeAmo({ routes: { "GET /api/v4/tasks": empty } })
     expect((await get(added, "/api/v4/tasks")).status).toBe(204)
