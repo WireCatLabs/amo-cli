@@ -1,12 +1,15 @@
 # Install and connect
 
-amoCRM and Kommo keep your deals, contacts and companies in the cloud, and an AI agent has no way to read them or
-update a deal for you. After this page, `amo` is installed and signed in to your account, and you or your agent can
-read and change the CRM from a terminal, from a script or over MCP. `amo` is a WireCat command-line tool: a program
-you run by typing its name in a terminal. It changes your account only as far as the permissions you set allow.
+Connect your amoCRM or Kommo account once, and from then on your AI agent can read and update your deals. The CRM keeps
+your deals, contacts and companies in the cloud, and it lets a program in only through a private integration that an
+account administrator makes.
 
-You connect `amo` once per account. An account administrator makes one private integration in amoCRM or Kommo, and
-both ways of signing in use it: a key that you paste, or a sign-in in the browser.
+Your agent then answers which deals are open, moves a deal to the next stage or finds a client, from a terminal or over
+MCP, as far as the permissions you set allow. You run the same commands yourself, or from a script.
+
+`amo` is a WireCat command-line tool, a program you run by typing its name in a terminal. You connect it once per
+account. One private integration serves both ways of signing in: a token you paste, or a sign-in in the browser. The
+one prerequisite is an account administrator, who makes the integration.
 
 **On this page:**
 
@@ -22,7 +25,7 @@ both ways of signing in use it: a key that you paste, or a sign-in in the browse
 ## Install
 
 Install `amo` once on each computer where you or an agent use it. You need Node.js 22.16 or a later 22.x, or 24 or
-later; Node 23 is not supported.
+later. Node 23 is not supported.
 
 ```sh
 npm install -g @wirecat/amo-cli
@@ -33,7 +36,7 @@ amo doctor
 `amo doctor` needs no network and opens no keyring. It shows the version, where settings live, the profiles that
 exist, and whether other users of the computer can read the settings.
 
-WireCat Desktop will install `amo` for you once amoCRM is in its catalog; that comes with the next Desktop release.
+WireCat Desktop will install `amo` for you once amoCRM is in its catalog. That comes with the next Desktop release.
 
 ## Create the integration
 
@@ -59,7 +62,7 @@ cannot be taken back. Read it before you sign
 [amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
 
 In Kommo (`<subdomain>.kommo.com` or `<subdomain>.amocrm.com`): Settings → Integrations → **Create integration**. Fill
-in the name, the description and the same **Redirect URL**. **Allow access** has every scope ticked by default; leave
+in the name, the description and the same **Redirect URL**. **Allow access** has every scope ticked by default. Leave
 **Duplicate control** and **Multiple sources** unticked, and save. Kommo asks for no waiver
 ([Kommo: private integration](https://developers.kommo.com/docs/private-integration)).
 
@@ -77,8 +80,8 @@ The key is amoCRM's long-lived token. It acts with the rights of the administrat
 3. Copy the token. It is shown only once
    ([amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step),
    [Kommo: long-lived token](https://developers.kommo.com/docs/long-lived-token)).
-4. Choose a profile name for this account, such as `work`, give the account's address, and paste the token when
-   `amo` asks:
+4. Choose a profile name for this account, such as `work`. Run the commands below with your account's address in
+   place of the example `https://example.amocrm.ru`, and paste the token when `amo` asks:
 
    ```sh
    amo work session start --host https://example.amocrm.ru
@@ -86,7 +89,7 @@ The key is amoCRM's long-lived token. It acts with the rights of the administrat
    ```
 
 `session start` reads the token without showing it, or from stdin. It checks the token against the account, and only
-then keeps it in the system keyring with the address; `--credential-storage file` keeps it in a private file instead.
+then keeps it in the system keyring with the address. `--credential-storage file` keeps it in a private file instead.
 `session status --check` shows the account and the user the token acts as. The address stays as you give it:
 `<subdomain>.amocrm.ru`, `<subdomain>.kommo.com` or `<subdomain>.amocrm.com`.
 
@@ -96,13 +99,14 @@ This sign-in uses OAuth: you allow the integration in the browser, and each pers
 
 1. On the integration's **«Ключи»** tab (Kommo: **Keys and scopes**), copy the integration ID. Keep the secret key
    open too.
-2. Run, with your address, and the ID in place of `INTEGRATION_ID`:
+2. Run the command below with your own address and integration ID in place of the examples
+   `https://example.amocrm.ru` and `0123abcd-4567-89ef-0123-456789abcdef`:
 
    ```sh
-   amo work session start --host https://example.amocrm.ru --client-id INTEGRATION_ID
+   amo work session start --host https://example.amocrm.ru --client-id 0123abcd-4567-89ef-0123-456789abcdef
    ```
 
-3. Paste the secret key when `amo` asks; it is not shown. `AMO_AMOCRM_CLIENT_SECRET` can give it instead.
+3. Paste the secret key when `amo` asks. It is not shown. `AMO_AMOCRM_CLIENT_SECRET` can give it instead.
 4. The browser opens amoCRM. Choose the account and click **«Разрешить»** (Allow).
 
 `amo` keeps the tokens and renews the access token itself. The integration's Redirect URI must be
@@ -114,7 +118,7 @@ This sign-in uses OAuth: you allow the integration in the browser, and each pers
   end date. Then you make a new one and run `session start` again.
 - **The integration sign-in** acts as the person who signs in, and has no end date to watch. amoCRM's refresh token
   lasts 3 months, and `amo` gets a new one each time it renews the access token. So it keeps working while `amo` runs
-  at least once in 3 months; after a longer pause, sign in again
+  at least once in 3 months. After a longer pause, sign in again
   ([amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
 
 ## Connect in WireCat Desktop
@@ -134,7 +138,7 @@ Desktop signs in with the key. The browser sign-in is the terminal command shown
 ## Sign out and revoke access
 
 `amo work session end` forgets the sign-in on this computer. `amo work account remove --keep-data` forgets the
-profile's sign-in and files; `--delete-data` also deletes the account's copy from the WireCat store.
+profile's sign-in and files, and `--delete-data` also deletes the account's copy from the WireCat store.
 
 Neither tells amoCRM. To stop a key on the account itself, for example after a leak, open the integration's
 **«Выданные доступы»** tab and click **«Отозвать доступ»**
