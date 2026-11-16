@@ -1,8 +1,8 @@
 # amo: amoCRM and Kommo CLI for AI agents
 
 <p align="center">
-  Your amoCRM or Kommo sales data in the terminal and in your AI agent. Deals, the pipeline, contacts and companies,
-  for you and for Claude Code, Codex, Cursor or any AI agent, with a permission on every change.
+  Know where every deal stands and what changed overnight, without opening amoCRM. Ask your AI agent, and it answers
+  from a copy of your deals on your computer, even offline. It moves and closes deals for you too, as far as you allow.
 </p>
 
 <p align="center">
@@ -17,29 +17,22 @@
   <a href="https://github.com/WireCatLabs/amo-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache 2.0"></a>
 </p>
 
-- **Your pipeline, within your agent's reach.** Ask about a deal, a stage or a client and get the answer from a copy
-  on your computer, even with no internet. Ask the agent to move a deal or close it, and it does.
-- **The morning starts with what changed.** New deals, stage moves, wins and losses since yesterday, as a desktop
-  notice or a message to your Telegram or mailbox.
-- **You decide what an agent may do.** Every action has its own permission. Messages to clients, Salesbots and
-  webhooks stay off until you turn them on.
+- **Ask instead of clicking.** "Which deals are stuck in Quote sent?" gets an answer in a second, in Claude Code, Codex
+  or any app that speaks MCP.
+- **The morning starts with what changed.** A short digest of yesterday's wins, losses and moves arrives before you
+  open the CRM.
+- **Nothing happens behind your back.** Every action has its own permission, and nothing reaches a client until you
+  allow it.
 
 ## What you get
 
-- **Know where every deal stands.** "Which of my deals are in Quote sent?" gives the deals with their amount and
-  owner, read from your computer.
-- **See the funnel.** How many deals reached each stage and went on, how much stands in each, and the share won in
-  a period you choose.
-- **Start the day with what changed.** New deals, stage moves, wins and losses, finished tasks. A digest of the last
-  day arrives at the time you choose.
-- **Find a client.** Any contact or company in the account, by name. A contact on your own deals comes with its
-  phones and e-mails.
-- **Change the CRM by asking.** Create a deal, move it to a stage by the stage's name, close it as lost with the
-  reason, update a contact or a company.
-- **Keep track of tasks.** The open and overdue tasks on your deals, with the comments and calls of the last 90 days,
-  once you turn them on.
-- **See the client in all your context.** One search finds a deal beside your messages, notes and meetings from the
-  other WireCat tools.
+- **The answer, not the search.** Ask about a deal, a client or a stage in your own words. The agent finds the deal
+  with its amount and owner, and the phones of the people on it.
+- **The funnel at a glance.** How far deals get this month, at which stage they drop off, and how much of it you won.
+- **Changes by asking.** "Move Example kitchen to Negotiation" or "close it as lost, the price was too high" is enough.
+  The agent finds the stage by its name.
+- **One search across your work.** A deal turns up next to the chat where you agreed on it and the meeting where you
+  discussed it, if you use the other WireCat tools.
 
 ```text
 You:    What changed in the CRM since yesterday?
