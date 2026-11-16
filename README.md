@@ -130,7 +130,7 @@ More: [settings](docs/configuration.md), [security](docs/security.md).
 - API v4 cannot delete a deal, so there is no `deals delete`; a contact's job title is an account field, set with
   `--field`, not `--position`.
 - Without amoCRM's paid API filter add-on, `sync` reads a contact or company one request at a time, and `people list`
-  and `organizations list` search by name only.
+  and `organizations list` cannot narrow by owner or time; a search by words still works.
 - `api call` takes only the operations of the amoCRM API v4 reference (`api list`); the Chats API, Drive and the AI
   agent API live on other hosts and are not reached.
 - Tested against a fake account built from the Kommo API reference, not yet against a live account.
