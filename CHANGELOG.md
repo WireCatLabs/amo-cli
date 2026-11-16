@@ -28,5 +28,5 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
   while another profile reads the same account (`--dry-run` lists it all and warns).
 - `schedule` runs `sync` on a timer.
 - `sync` resumes inside a page when a run's request budget ends, and reads clients only by the ids its deals name.
-  A contact given to a colleague or taken off your deals loses its phones and e-mails in the copy, and leaves it at
-  the next `sync --rescan`.
+  A colleague's client on none of your deals never enters the copy, and a record restored from amoCRM's trash comes
+  back whatever order amoCRM lists the events in.

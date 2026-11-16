@@ -17,6 +17,28 @@ const over = (options: FakeAmoOptions = {}, page?: number) => {
   return { account, transport, source }
 }
 
+/** A source of its own over the same fake, as a new run builds one. */
+const fresh = (account: ReturnType<typeof fakeAmo>, page?: number) =>
+  amoCrmSource(
+    () =>
+      new AmoTransport({
+        signIn: { origin: FAKE_ORIGIN, token: FAKE_TOKEN },
+        fetch: account.fetch,
+        sleep: async () => {},
+      }),
+    page ? { page } : {},
+  )
+type Changes = Awaited<ReturnType<ReturnType<typeof fresh>["changes"]>>
+const SPENT = new Error("budget")
+const throwSpent = (): never => {
+  throw SPENT
+}
+/** A call that read nothing before the budget ran out stops the run, as core's sync does; the next run goes on. */
+const spentOr = (error: unknown) => {
+  if (error !== SPENT) throw error
+  return null
+}
+
 const mine = { scope: { mode: "mine" as const, self: String(FAKE_USER_ID), also: [] }, spend: () => {}, gap: () => {} }
 
 const all = async (
@@ -251,27 +273,26 @@ describe("amoCrmSource", () => {
     expect(reads.length).toBeLessThan(5)
   })
 
-  it("names a deleted record from its last event, so a restored one stays", async () => {
+  it("names a deleted record, and keeps one restored after its deletion", async () => {
     const { account, source } = over()
-    account.remove("contact", 402, 1767225600 + 500)
-    account.data.events.push({
-      ...account.data.events[0],
-      id: "r",
-      type: "contact_restored",
-      entity_id: 401,
-      entity_type: "contact",
-      created_at: 1767225600 + 900,
-    } as never)
-    account.data.events.push({
-      ...account.data.events[0],
-      id: "d",
-      type: "contact_deleted",
-      entity_id: 401,
-      entity_type: "contact",
-      created_at: 1767225600 + 800,
-    } as never)
-    const { answer } = await all(source, "person", new Date(1767225600 * 1000).toISOString())
-    expect("removed" in answer && answer.removed).toEqual(["402"])
+    account.remove("lead", 302, 1767225600 + 500)
+    const event = (id: string, type: string, at: number) =>
+      ({ ...account.data.events[0], id, type, entity_id: 301, entity_type: "lead", created_at: at }) as never
+    account.data.events.push(
+      event("r", "lead_restored", 1767225600 + 900),
+      event("d", "lead_deleted", 1767225600 + 800),
+    )
+    const alive = new Map<string, boolean>()
+    let page: string | undefined
+    for (;;) {
+      const answer = await source.changes("deal", new Date(1767225600 * 1000).toISOString(), page, mine)
+      if ("reset" in answer) throw new Error("reset")
+      for (const one of answer.items) alive.set(one.externalId, true)
+      for (const one of answer.removed ?? []) alive.set(one, false)
+      if (!answer.hasMore) break
+      page = answer.nextCursor
+    }
+    expect([alive.get("301"), alive.get("302")]).toEqual([true, false])
   })
 
   it("reads stage history from lead_status_changed events, oldest first, after the last one read", async () => {
@@ -455,6 +476,193 @@ describe("amoCrmSource", () => {
       page = answer.nextCursor
     }
     expect(alive.get("301")).toBe(true)
+  })
+
+  it("keeps a record restored after its deletion whatever order the events pages come in", async () => {
+    const { account, source } = over()
+    const base = 1767225600
+    const event = (id: string, type: string, entity: number, at: number) =>
+      ({ ...account.data.events[0], id, type, entity_id: entity, entity_type: "lead", created_at: at }) as never
+    account.data.events.push(event("r", "lead_restored", 301, base + 500))
+    for (let at = 219; at >= 0; at--)
+      account.data.events.push(event(`f${at}`, "lead_deleted", 9000 + at, base + 20 + at))
+    account.data.events.push(event("d", "lead_deleted", 301, base + 10))
+    const alive = new Map<string, boolean>()
+    let page: string | undefined
+    for (let call = 0; call < 60; call++) {
+      const answer = await source.changes("deal", new Date(base * 1000).toISOString(), page, mine)
+      if ("reset" in answer) throw new Error("reset")
+      for (const one of answer.items) alive.set(one.externalId, true)
+      for (const one of answer.removed ?? []) alive.set(one, false)
+      if (!answer.hasMore) break
+      page = answer.nextCursor
+    }
+    expect([alive.get("301"), alive.get("9000")]).toEqual([true, false])
+  })
+
+  it("moves through an events page of restores under a budget of 20 requests a run", async () => {
+    const account = fakeAmo({ perSecond: 10_000, apiFilter: false })
+    const [lead] = account.data.leads
+    if (!lead) throw new Error("seed")
+    const base = Math.floor(Date.now() / 1000) - 60
+    for (let at = 0; at < 30; at++) {
+      account.data.leads.push({ ...lead, id: 3100 + at })
+      account.data.events.push({
+        ...account.data.events[0],
+        id: `r${at}`,
+        type: "lead_restored",
+        entity_id: 3100 + at,
+        entity_type: "lead",
+        created_at: base + at,
+      } as never)
+    }
+    const seen = new Set<string>()
+    let page: string | undefined = `r1.0@${Date.now()}`
+    for (let run = 0; run < 6 && page; run++) {
+      const source = fresh(account)
+      await source.account()
+      await source.fields("deal")
+      let left = 19
+      const tight = { ...mine, spend: () => (left-- <= 0 ? throwSpent() : undefined) }
+      const answer: Changes | null = await source
+        .changes("deal", new Date(base * 1000).toISOString(), page, tight)
+        .catch(spentOr)
+      if (answer === null || "reset" in answer) continue
+      for (const one of answer.items) seen.add(one.externalId)
+      page = answer.hasMore ? answer.nextCursor : undefined
+    }
+    expect(page).toBeUndefined()
+    expect([...seen].filter((one) => one.startsWith("31"))).toHaveLength(30)
+  })
+
+  it("never skips a changed client when rows above it are deleted between runs", async () => {
+    const account = fakeAmo({ perSecond: 10_000, apiFilter: false })
+    const top = Math.floor(Date.now() / 1000) + 100
+    const [lead] = account.data.leads
+    const [contact] = account.data.contacts
+    if (!lead || !contact) throw new Error("seed")
+    for (let at = 0; at < 6; at++) {
+      account.data.contacts.push({
+        ...contact,
+        id: 600 + at,
+        responsible_user_id: 7002,
+        companies: [],
+        updated_at: top - at,
+      })
+      account.data.leads.push({ ...lead, id: 700 + at, contacts: [600 + at], companies: [] })
+    }
+    const cursor = new Date().toISOString()
+    const seen: string[] = []
+    let page: string | undefined = `c2.0@${Date.now()}`
+    for (let call = 0; call < 20 && page; call++) {
+      const source = fresh(account, 2)
+      await source.account()
+      await source.fields("person")
+      let left = call === 0 ? 1 : 100
+      const tight = { ...mine, spend: () => (left-- <= 0 ? throwSpent() : undefined) }
+      const answer: Changes | null = await source.changes("person", cursor, page, tight).catch(spentOr)
+      if (answer === null || "reset" in answer) continue
+      seen.push(...answer.items.map((one) => one.externalId))
+      if (call === 0) account.data.contacts = account.data.contacts.filter((one) => one.id !== 600 && one.id !== 601)
+      page = answer.hasMore && answer.nextCursor?.startsWith("c") ? answer.nextCursor : undefined
+    }
+    expect(seen).toEqual(expect.arrayContaining(["603", "604", "605"]))
+  })
+
+  it.each([
+    ["the clients of changed leads", "n", "updated"],
+    ["a first round's clients", "w", "given away"],
+  ])("never skips a company in %s when a lead naming it moves between runs", async (_, phase, how) => {
+    const account = fakeAmo({ perSecond: 10_000, apiFilter: false })
+    const top = Math.floor(Date.now() / 1000) + 100
+    const [lead] = account.data.leads
+    const [company] = account.data.companies
+    if (!lead || !company) throw new Error("seed")
+    for (const one of [901, 902, 910, 911, 912])
+      account.data.companies.push({ ...company, id: one, responsible_user_id: 7001 })
+    const named = (id: number, to: number, at: number) => ({
+      ...lead,
+      id,
+      responsible_user_id: 7001,
+      contacts: [],
+      companies: [to],
+      updated_at: top - at,
+    })
+    account.data.leads = [
+      named(800, 910, 0),
+      named(801, 911, 1),
+      named(802, 912, 2),
+      named(803, 901, 3),
+      named(804, 902, 4),
+      named(805, 901, 5),
+    ]
+    const cursor = phase === "n" ? new Date().toISOString() : null
+    const seen: string[] = []
+    let page: string | undefined = `${phase}2.0@${Date.now()}`
+    for (let call = 0; call < 20 && page; call++) {
+      const source = fresh(account, 3)
+      await source.account()
+      await source.fields("organization")
+      let left = call === 0 ? 1 : 100
+      const tight = { ...mine, spend: () => (left-- <= 0 ? throwSpent() : undefined) }
+      const answer: Changes | null = await source.changes("organization", cursor, page, tight).catch(spentOr)
+      if (answer === null || "reset" in answer) continue
+      seen.push(...answer.items.map((one) => one.externalId))
+      const moved = account.data.leads.find((one) => one.id === 803)
+      if (call === 0 && moved) {
+        if (how === "updated") moved.updated_at = top + 50
+        else moved.responsible_user_id = 7002
+      }
+      page = answer.hasMore && answer.nextCursor?.startsWith(phase) ? answer.nextCursor : undefined
+    }
+    expect(seen).toContain("902")
+  })
+
+  it("resumes a client's owner lookup by lead id, so a lead deleted between runs does not hide a chosen one", async () => {
+    const account = fakeAmo({ perSecond: 10_000, apiFilter: false })
+    const [lead] = account.data.leads
+    const [contact] = account.data.contacts
+    if (!lead || !contact) throw new Error("seed")
+    account.data.contacts.push({
+      ...contact,
+      id: 650,
+      responsible_user_id: 7002,
+      companies: [],
+      updated_at: Math.floor(Date.now() / 1000) + 100,
+    })
+    for (let at = 0; at < 20; at++)
+      account.data.leads.push({
+        ...lead,
+        id: 3000 + at,
+        responsible_user_id: at === 10 ? 7001 : 7002,
+        contacts: [650],
+        companies: [],
+      })
+    const cursor = new Date().toISOString()
+    let found: { phones?: string[] } | undefined
+    let page: string | undefined = `c1.0@${Date.now()}`
+    for (let call = 0; call < 10 && page; call++) {
+      const source = fresh(account)
+      await source.account()
+      await source.fields("person")
+      let left = call === 0 ? 10 : 100
+      const tight = { ...mine, spend: () => (left-- <= 0 ? throwSpent() : undefined) }
+      const answer: Changes | null = await source.changes("person", cursor, page, tight).catch(spentOr)
+      if (answer === null || "reset" in answer) continue
+      found ??= answer.items.find((one) => one.externalId === "650") as { phones?: string[] } | undefined
+      if (call === 0) account.data.leads = account.data.leads.filter((one) => one.id !== 3000)
+      page = answer.hasMore && answer.nextCursor?.startsWith("c") ? answer.nextCursor : undefined
+    }
+    expect(found?.phones?.length).toBeGreaterThan(0)
+  })
+
+  it("reads stage history again from a little before its cursor, and names each move once", async () => {
+    const { account, source } = over()
+    const [first] = account.data.events
+    if (!first) throw new Error("seed")
+    const page = await source.stageHistory?.("deal", 0, String(first.created_at + 5))
+    expect(page?.items.map((one) => one.externalId)).toContain(first.id)
+    expect(new Set(page?.items.map((one) => one.externalId)).size).toBe(page?.items.length)
   })
 
   it("lists by an exact time to the second it names", async () => {

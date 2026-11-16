@@ -148,27 +148,37 @@ Languages: ru, en.
     range filter (`filter[id]` takes a list of ids only, Kommo `GET /api/v4/leads`), so paging by id is not possible:
     `sync --rescan` heals a shifted old row. Nothing tells the owner when to run it.
   - A round is cut into calls of cli-core's request budget (`--max-pages`). The cursor names a spot,
-    `<phase><page>.<offset>[.<lead>][~<id>]@<round start>`: deal pages (`d`), every client when there is no scope
-    (`a`), the chosen leads' clients on a full round (`w`), changed clients (`c`), clients on changed leads (`n`) and
-    deletions (`r`). A call that runs out of requests answers what it has with the spot it reached; one that could not
-    move refuses.
-    - `<id>` is the last row decided. The next run reads the page again and goes on after that row, so a row deleted
-      or given away between runs does not skip the next one. When the row itself is gone, the page is read again from
-      its start: a repeat, never a skip.
-    - A changed client that is not a chosen user's is kept when one of its leads is. Without the add-on each lead is
-      read by id, and a client on more leads than one run's budget is read over several runs: `<lead>` counts its
-      leads already read, none a chosen user's.
-    - Deletions are answered one events page at a time. A record an earlier page named deleted and a later page names
-      restored is read by id and saved again, which revives it in the store (cli-core's upserts clear `deleted_at`).
-  - A changed contact that is no longer the scope's (given to a colleague, or off every chosen lead) is saved once
-    more with its new assignee and without phones and e-mails; cli-core removes contacts only at the next narrowing or
-    `sync --rescan`, as b24 does. A company has no such pass and stays (open).
+    `<phase><page>.<offset>[.<sub>][~<id>]@<round start>`: deal pages (`d`), every client when there is no scope
+    (`a`), the chosen leads' clients on a full round (`w`), changed clients (`c`), clients on changed leads (`n`),
+    deletions (`r`) and restores (`s`). A call that runs out of requests answers what it has with the spot it reached;
+    one that could not move refuses.
+    - `<id>` is the last row done: a client in `c`, a lead in `w` and `n`. The next run finds it on its page or, when
+      rows above it were deleted, on a page before, and goes on after it. A row gone from every page restarts the
+      phase one page before the one it was on. Either way rows repeat; none is skipped, except when more rows were
+      deleted between runs than a page holds before the saved one.
+    - With `<sub>`, `<id>` is the row under way: a client whose leads' owners are read (without the add-on, one lead a
+      request), or a lead whose clients are read. `<sub>` is the last linked id read, in id order, so a link added or
+      removed between runs does not shift it.
+    - Without the add-on, rows are ordered by `updated_at` alone; rows with the same second may trade places across a
+      page edge between runs (open, a live question).
+  - A changed contact or company that is a colleague's and on none of the chosen leads stays out of the copy. A
+    contact that leaves the scope goes by cli-core's rule, as in b24: at the next narrowing or `sync --rescan`, a stored
+    contact whose stored assignee is outside the scope and that no stored deal or company names is removed. One
+    assigned to the user and then given to a colleague keeps the user as its stored assignee, so it stays, with its
+    phones (open: cli-core would have to re-save only the contacts it holds).
   - A later round still reads by id every client on a changed chosen lead, stored or not. Only a client new to the
     lead needs it; telling which needs the store's links or `*_linked` events (open).
-- Deletions come from `<entity>_deleted` and `<entity>_restored` events since the cursor; the last event of a record
-  decides. Stage history comes from `lead_status_changed` events (`value_after[0].lead_status`), read whole each time
-  after the last one read, since the event order is not documented. Under `mine` it keeps only the chosen users'
-  leads, its cursor moves past colleagues' moves too, and `h<from>.<page>.<offset>.<latest>` resumes inside a page.
+- Deletions and restores are read from events in a window fixed for the round (`filter[created_at][from]` the cursor
+  less 10 minutes, `[to]` the round's start), so pages keep their offsets across runs. The events list has no
+  documented order and no `order` parameter ([events-and-notes](https://www.amocrm.ru/developers/content/crm_platform/events-and-notes),
+  Kommo `GET /api/v4/events`). So `<entity>_deleted` events are answered first, each page on its own, and then each
+  record a `<entity>_restored` event names is read by id: alive, it is saved again (cli-core's upserts clear
+  `deleted_at`); gone or `is_deleted`, it is removed. The newest state wins in any order. Contacts skip both: cli-core
+  never marks a contact deleted.
+- Stage history comes from `lead_status_changed` events (`value_after[0].lead_status`). Each span reads from 10
+  minutes before the last event read, so an event written late with an earlier time is still read, and names each
+  event once. Under `mine` it keeps only the chosen users' leads, its cursor moves past colleagues' moves too, and
+  `h<from>.<page>.<offset>.<latest>` resumes inside a page.
 - `filter[type]` takes a comma string in Kommo's reference (`GET /api/v4/events`) and an array in amoCRM's
   ([events-and-notes](https://www.amocrm.ru/developers/content/crm_platform/events-and-notes)): `.amocrm.ru` hosts get
   `filter[type][]`, others the comma string. Both are the one backend, so one form likely works for both; the fake
@@ -278,8 +288,15 @@ the main pipeline").
 - A later round re-reads every client of a changed lead (see the store and sync).
 - A company given to a colleague or taken off every chosen deal stays in the copy: cli-core has no cleanup pass for
   companies when the source names its deletions itself.
-- Live checks: the `filter[type]` form on a `.amocrm.ru` account, `mode=post_message`, a refresh after 24 hours, and
-  the answer of an account without the add-on.
+- Two profiles on one account share its copy, which is keyed by the host. A non-administrator's profile reads, offline,
+  the deals an administrator's profile copied, and `search all` finds them by their contacts' e-mails (checked on the
+  fake, 2026-11-16). Phones are not printed offline. b24 does the same; the reads are cli-core's, so a fix (reads
+  limited to the copy's own user) is cli-core's.
+- Live checks:
+  - the `filter[type]` form on a `.amocrm.ru` account;
+  - one `GET /api/v4/events?filter[type][]=lead_status_changed`, to see whether events come newest or oldest first;
+  - one by-id read of a deleted lead: 204, or a record with `is_deleted`;
+  - `mode=post_message`, a refresh after 24 hours, and the answer of an account without the add-on.
 - How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
 - The event types `contact_deleted`, `company_deleted` and their `_restored` follow the `lead_deleted` pattern; no
   live answer has been seen.
