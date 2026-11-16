@@ -1,6 +1,6 @@
 ---
 name: amo-cli
-description: Use amo, the WireCat CLI for amoCRM and Kommo, from an agent — find an API operation, check its permissions, call it with the owner's profile, read JSON answers. Use when a task needs the owner's amoCRM or Kommo account: leads, contacts, companies, pipelines.
+description: "Use amo to read and change an amoCRM or Kommo account's CRM - deals, pipelines and the funnel, contacts (people), companies (organizations), tasks and notes, users - with the owner's profile and JSON answers. Deals and their clients are synced into the local WireCat store, read offline, and `changes list` shows what changed for a morning digest. Use when a question could be answered from the owner's amoCRM or Kommo sales data (how a deal stands, what is open, what changed, who a client is), when the owner asks to create, move, close or change a CRM record, or to set amo up."
 metadata:
   openclaw:
     requires:
