@@ -1,6 +1,14 @@
 # Use it
 
-This page explains how a command is built, and how an agent uses the tool. Read it before your first command.
+Every command starts with a profile, reads the local copy your first sync makes, and answers in JSON for scripts
+and agents.
+
+- [The profile comes first](#the-profile-comes-first)
+- [Sign in](#sign-in)
+- [The first sync](#the-first-sync)
+- [Call the API](#call-the-api)
+- [Output for scripts](#output-for-scripts)
+- [Agents](#agents)
 
 ## The profile comes first
 

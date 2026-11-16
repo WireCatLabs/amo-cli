@@ -19,8 +19,8 @@ the permissions say.
 
 ## Run records
 
-A command that fails is kept as a run, for `amo runs list` and `runs show`. A command you add that does its work
-in `context.run` is kept when it succeeds too, unless `record` is `false` (then only failures) or it ran with
-`--no-record`. `api call` and `session status --check` do their work in a run, so `--record` keeps them. `record_input` decides whether a run
+A command that fails is kept as a run, for `amo runs list` and `runs show`. `api call` and
+`session status --check` are kept when they succeed too, unless `record` is `false` (then only failures) or they ran
+with `--no-record`. `record_input` decides whether a run
 keeps the words you typed; it is `true` unless you set it to `false`. Secrets are masked either way; see
 [Security](security.md).

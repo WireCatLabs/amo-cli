@@ -96,10 +96,10 @@ This sign-in uses OAuth: you allow the integration in the browser, and each pers
 
 1. On the integration's **«Ключи»** tab (Kommo: **Keys and scopes**), copy the integration ID. Keep the secret key
    open too.
-2. Run, with your address and ID:
+2. Run, with your address, and the ID in place of `INTEGRATION_ID`:
 
    ```sh
-   amo work session start --host https://example.amocrm.ru --client-id <integration ID>
+   amo work session start --host https://example.amocrm.ru --client-id INTEGRATION_ID
    ```
 
 3. Paste the secret key when `amo` asks; it is not shown. `AMO_AMOCRM_CLIENT_SECRET` can give it instead.

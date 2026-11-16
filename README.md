@@ -1,10 +1,10 @@
 # amo — amoCRM and Kommo CLI for AI agents
 
-`amo` reads and changes an amoCRM or Kommo account's sales data from the terminal, from scripts and from AI agents.
-It signs in with a long-lived token from one of the account's private integrations and acts with the rights of the
-administrator who made it. Today it gives the sign-in, `doctor` and every operation of the amoCRM API v4 through
-`api call`, each with its own permission. Deals, contacts and companies in the local
-[WireCat](https://wirecat.dev) store, as `b24` has them, come next.
+`amo` reads and changes an amoCRM or Kommo account's sales data from the terminal, from scripts and from AI agents:
+deals, pipelines and their stages, contacts, companies, tasks and notes. It signs in with a long-lived token or through
+a private integration in the browser. Your deals and their clients are copied into the local
+[WireCat](https://wirecat.dev) store, so lists, the funnel and search work offline, beside your other WireCat tools'
+data, and `changes list` shows what changed since yesterday for a morning digest.
 
 ## Quick start
 
