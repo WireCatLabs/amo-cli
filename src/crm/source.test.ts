@@ -166,6 +166,40 @@ describe("crmWriteContract", () => {
     ])
   })
 
+  it.each([
+    ["lastName", "Sidorov", "Ivan Sidorov"],
+    ["firstName", "Pyotr", "Pyotr Petrov"],
+  ] as const)("splits a contact that has only a full name, so %s keeps the other part", async (part, value, name) => {
+    const { account, transport, source } = over()
+    const contact = account.data.contacts.find((one) => one.id === 401)
+    if (!contact) throw new Error("seed")
+    Object.assign(contact, { name: "Ivan Petrov", first_name: "", last_name: "" })
+    await amoCrmWriter(() => transport, source).update("person", "401", { [part]: value }, { operationId: "a" })
+    expect(contact.name).toBe(name)
+  })
+
+  // Stands in for cli-core's "an update of one field keeps the rest", left out above for `position` alone.
+  it("makes a contact, and an update of one field keeps its name and e-mail; renames a company", async () => {
+    const { transport, source } = over()
+    const writer = amoCrmWriter(() => transport, source)
+    const made = await writer.create(
+      "person",
+      { firstName: "Anna", lastName: "Example", emails: ["anna@example.com"] },
+      { operationId: "a" },
+    )
+    const changed = await writer.update("person", made.externalId, { owner: "7002" }, { operationId: "b" })
+    expect(changed).toMatchObject({ externalId: made.externalId, name: made.name, emails: ["anna@example.com"] })
+    expect(changed.assignee).toBe("7002")
+    const company = await writer.create("organization", { name: "Example contract company" }, { operationId: "c" })
+    const renamed = await writer.update(
+      "organization",
+      company.externalId,
+      { name: "Example renamed company" },
+      { operationId: "d" },
+    )
+    expect(renamed).toMatchObject({ externalId: company.externalId, name: "Example renamed company" })
+  })
+
   it("makes a contact with its e-mail, and renames it keeping the rest", async () => {
     const { transport, source } = over()
     const writer = amoCrmWriter(() => transport, source)
@@ -323,6 +357,104 @@ describe("amoCrmSource", () => {
     await source.stageHistory?.("deal", 0)
     const read = account.calls.find((one) => one.path === "/api/v4/events")
     expect(Object.keys(read?.query ?? {})).toContain(name)
+  })
+
+  it("moves the stage history cursor past colleagues' moves it leaves out", async () => {
+    const { account, source } = over()
+    const [first] = account.data.events
+    if (!first) throw new Error("seed")
+    account.data.events = [{ ...first, id: "01fakeeventX", entity_id: 303 }]
+    const page = await source.stageHistory?.("deal", 0, undefined, mine)
+    expect(page && "cursor" in page ? page.cursor : null).toBe(String(first.created_at))
+    expect(page?.items).toEqual([])
+  })
+
+  it("goes on after the client it last decided when a row above it was deleted between runs", async () => {
+    const account = fakeAmo({ perSecond: 10_000, apiFilter: false })
+    const top = Math.floor(Date.now() / 1000) + 100
+    const [lead] = account.data.leads
+    const [contact] = account.data.contacts
+    if (!lead || !contact) throw new Error("seed")
+    for (let at = 0; at < 6; at++) {
+      account.data.contacts.push({ ...contact, id: 600 + at, responsible_user_id: 7002, updated_at: top - at })
+      account.data.leads.push({ ...lead, id: 700 + at, contacts: [600 + at], companies: [] })
+    }
+    const sourceOf = () =>
+      amoCrmSource(() => new AmoTransport({ signIn: { origin: FAKE_ORIGIN, token: FAKE_TOKEN }, fetch: account.fetch }))
+    let left = 0
+    const spent = new Error("budget")
+    const tight = {
+      ...mine,
+      spend: () => {
+        if (left-- <= 0) throw spent
+      },
+    }
+    const cursor = new Date().toISOString()
+    const seen: string[] = []
+    let page: string | undefined
+    for (let call = 0; call < 40; call++) {
+      // Each call is a run of its own; the account and fields are read before the budget counts.
+      const source = sourceOf()
+      await source.account()
+      await source.fields("person")
+      left = call === 0 ? 3 : 4
+      const answer = await source.changes("person", cursor, page, tight).catch((error: unknown) => {
+        if (error !== spent) throw error
+        return null
+      })
+      if (answer === null) continue
+      if ("reset" in answer) throw new Error("reset")
+      seen.push(...answer.items.map((one) => one.externalId))
+      if (call === 0)
+        account.data.contacts.splice(
+          account.data.contacts.findIndex((one) => one.id === 600),
+          1,
+        )
+      if (!answer.hasMore) break
+      page = answer.nextCursor
+    }
+    expect(seen).toEqual(expect.arrayContaining(["601", "602", "603", "604", "605"]))
+  })
+
+  it("keeps a record restored on a later events page than its deletion, though a run's budget cut between", async () => {
+    const { account, source } = over()
+    const base = 1767225600
+    const event = (id: string, type: string, entity: number, at: number) =>
+      ({ ...account.data.events[0], id, type, entity_id: entity, entity_type: "lead", created_at: at }) as never
+    account.data.events.push(event("d", "lead_deleted", 301, base + 10))
+    for (let at = 0; at < 220; at++)
+      account.data.events.push(event(`f${at}`, "lead_deleted", 9000 + at, base + 20 + at))
+    account.data.events.push(event("r", "lead_restored", 301, base + 500))
+    // core's sync reads the account and the fields before it asks for changes.
+    await source.account()
+    await source.fields("deal")
+    let left = 0
+    const spent = new Error("budget")
+    const tight = {
+      ...mine,
+      spend: () => {
+        if (left-- <= 0) throw spent
+      },
+    }
+    const alive = new Map<string, boolean>()
+    let page: string | undefined
+    for (let call = 0; call < 60; call++) {
+      left = 2
+      const answer = await source
+        .changes("deal", new Date(base * 1000).toISOString(), page, tight)
+        .catch((error: unknown) => {
+          if (error !== spent) throw error
+          return null
+        })
+      if (answer === null) continue
+      if ("reset" in answer) throw new Error("reset")
+      // core saves a page's items, then removes its removed.
+      for (const one of answer.items) alive.set(one.externalId, true)
+      for (const one of answer.removed ?? []) alive.set(one, false)
+      if (!answer.hasMore) break
+      page = answer.nextCursor
+    }
+    expect(alive.get("301")).toBe(true)
   })
 
   it("lists by an exact time to the second it names", async () => {

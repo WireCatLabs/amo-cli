@@ -1,5 +1,5 @@
 import { CliError, isCliError } from "@wirecat/cli-base"
-import type { CrmField, CrmItem, CrmKind, CrmRecords, CrmStageEntry } from "@wirecat/cli-core"
+import type { CrmField, CrmItem, CrmKind, CrmPerson, CrmRecords, CrmStageEntry } from "@wirecat/cli-core"
 import {
   type CrmCallContext,
   type CrmChanges,
@@ -74,22 +74,35 @@ const readOne = async (caller: Caller, route: Route, externalId: string, query: 
 }
 
 /**
- * Where a round stands, `<phase><page>.<offset>@<when the round started>`: the phase (`d` deals, `w` the clients on
- * the chosen users' leads, `c` changed clients, `n` the clients on changed leads, `a` every client, `r` deletions),
- * the page, and how far into it. A call the run's budget cuts answers what it read and this place, so the next run
- * goes on from there (WC-LIFE-12).
+ * Where a round stands, `<phase><page>.<offset>[.<lead>][~<id>]@<when the round started>`: the phase (`d` deals, `w`
+ * the clients on the chosen users' leads, `c` changed clients, `n` the clients on changed leads, `a` every client, `r`
+ * deletions), the page, and how far into it. A call the run's budget cuts answers what it read and this place, so the
+ * next run goes on from there (WC-LIFE-12).
+ *
+ * `id` is the last row decided, or with `lead` the changed client whose leads' owners are being read, `lead` of them
+ * already read and none a chosen user's. The next run finds the row by its id: a row deleted or given away between
+ * runs shifts the page's offsets, and a bare offset would skip the row after it.
  */
 interface Spot {
   ph: string
   p: number
   o: number
+  l?: number
+  k?: string
 }
 const spotOf = (page: string | undefined, now: number) => {
-  const found = /^([a-z])(\d+)\.(\d+)@(\d+)$/.exec(page ?? "")
+  const found = /^([a-z])(\d+)\.(\d+)(?:\.(\d+))?(?:~(\d+))?@(\d+)$/.exec(page ?? "")
   if (!found) return { spot: null, started: now }
-  return { spot: { ph: found[1] ?? "", p: Number(found[2]), o: Number(found[3]) }, started: Number(found[4]) }
+  const spot: Spot = { ph: found[1] ?? "", p: Number(found[2]), o: Number(found[3]) }
+  if (found[4] !== undefined) spot.l = Number(found[4])
+  if (found[5] !== undefined) spot.k = found[5]
+  return { spot, started: Number(found[6]) }
 }
-const keyOf = (spot: Spot) => `${spot.ph}${spot.p}.${spot.o}`
+const keyOf = (spot: Spot) =>
+  `${spot.ph}${spot.p}.${spot.o}${spot.l === undefined ? "" : `.${spot.l}`}${spot.k === undefined ? "" : `~${spot.k}`}`
+
+/** A contact no longer the scope's is saved once more without its phones and e-mails; a rescan then drops it. */
+const AWAY: Partial<CrmPerson> = { phone: null, email: null, phones: [], emails: [] }
 
 /** The run's budget said no inside a call: the call answers what it has read so far. */
 class Cut extends Error {}
@@ -289,8 +302,8 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
   /**
    * One page of the leads a round reads: in a full `mine` round only the chosen users' (narrowed by the add-on, else
    * kept from every lead), after a cursor every changed one, as core drops a lead given away by its assignee. The
-   * clients' rounds walk the same pages before the deals', so a run lists each lead page once (research §4 counts an
-   * account enumerated over and over as a cause of a block).
+   * clients' rounds of a full round walk the same pages before the deals', so it lists each lead page once (research §4
+   * counts an account enumerated over and over as a cause of a block).
    */
   const leadPages = new Map<string, { at: number; page: Promise<{ rows: Raw[]; more: boolean }> }>()
   const leadPage = (caller: Caller, at: number, from: number | null, chosen: readonly string[] | null) => {
@@ -377,13 +390,19 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       const client = amoKind === "deal" ? null : (amoKind as "person" | "organization")
       const first: Spot = { ph: client === null ? "d" : !chosen ? "a" : from === null ? "w" : "c", p: 1, o: 0 }
       let spot = given ?? first
+      // A cut call that moved nothing refuses: core would see the same page twice.
+      let progressed = false
       const rows: Raw[] = []
+      const away = new Set<string>()
       const kept = seenOf(kind, started)
       const gone = new Map<string, { at: number; deleted: boolean }>()
       const answer = async (done: boolean): Promise<CrmChanges<CrmRecords[K]>> => {
         const removed = [...gone].flatMap(([entity, { deleted }]) => (deleted ? [entity] : []))
+        const items = (await mapped(kind, rows, caller)).map((one) =>
+          away.has(one.externalId) ? { ...one, ...AWAY, contactTypes: undefined } : one,
+        )
         return {
-          items: await mapped(kind, rows, caller),
+          items,
           ...(removed.length ? { removed } : {}),
           hasMore: !done,
           ...(done ? { cursor: new Date(started).toISOString() } : { nextCursor: `${keyOf(spot)}@${started}` }),
@@ -391,7 +410,14 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       }
       const after = (more: boolean, next: string): boolean => {
         spot = more ? { ph: spot.ph, p: spot.p + 1, o: 0 } : { ph: next, p: 1, o: 0 }
+        progressed = true
         return more
+      }
+      /** Finds a resumed spot's row on the page read again; when it is gone, the page is read from its start. */
+      const settle = (ids: readonly string[]) => {
+        if (spot.k === undefined) return
+        const at = ids.indexOf(spot.k)
+        spot = at < 0 ? { ph: spot.ph, p: spot.p, o: 0 } : { ...spot, o: spot.l === undefined ? at + 1 : at }
       }
       const end = from === null ? "" : "r"
       /** Reads the page's named clients from the spot's offset, one request at a time, each client once a round. */
@@ -407,7 +433,9 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
           })
           for (const raw of found) rows.push(raw)
           for (const one of left.slice(0, read)) kept.add(one)
-          spot = { ...spot, o: names.indexOf(left[read - 1] ?? "") + 1 }
+          const last = left[read - 1] ?? ""
+          spot = { ...spot, o: names.indexOf(last) + 1, k: last }
+          progressed = true
           // A page saved now is kept if the process ends before the next answer.
           if (rows.length >= CHUNK) return false
         }
@@ -434,23 +462,39 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
             const names = [
               ...new Set(own.flatMap((raw) => linkedIds(raw, client === "person" ? "contacts" : "companies"))),
             ]
+            settle(names)
             if (!(await readNamed(names))) return await answer(false)
             if (after(more, spot.ph === "w" ? "" : "r")) return await answer(false)
             continue
           }
           if (spot.ph === "c" && client && chosen && from !== null) {
             const { rows: changed, more } = await round(caller, client, spot.p, from)
+            settle(changed.map((raw) => id(raw.id) ?? ""))
             while (spot.o < changed.length) {
               const raw = changed[spot.o] as Raw
+              const externalId = id(raw.id) ?? ""
               const leads = linkedIds(raw, "leads")
               const ours = () =>
                 chosen.includes(ownerOf(raw)) || leads.some((lead) => chosen.includes(owners.get(lead) ?? ""))
-              while (!ours() && (await resolveOwners(caller, leads))) {}
+              let lead = spot.l ?? 0
+              while (!ours() && lead < leads.length) {
+                if (owners.has(leads[lead] ?? "")) {
+                  lead += 1
+                  continue
+                }
+                spot = { ...spot, l: lead, k: externalId }
+                await resolveOwners(caller, leads.slice(lead))
+                progressed = true
+              }
               if (ours()) {
                 rows.push(raw)
-                kept.add(id(raw.id) ?? "")
+                kept.add(externalId)
+              } else if (client === "person") {
+                rows.push(raw)
+                away.add(externalId)
               }
-              spot = { ...spot, o: spot.o + 1 }
+              spot = { ph: spot.ph, p: spot.p, o: spot.o + 1, k: externalId }
+              progressed = true
             }
             if (after(more, "n")) return await answer(false)
             continue
@@ -469,14 +513,19 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
               if (entity && at >= (gone.get(entity)?.at ?? 0))
                 gone.set(entity, { at, deleted: raw.type === `${event}_deleted` })
             }
-            after(more && events.length > 0, "")
+            // A record an earlier page named deleted is saved again, which revives it in the store.
+            const back = [...gone].flatMap(([entity, { deleted }]) => (deleted ? [] : [entity]))
+            for (const raw of await byIds(caller, amoKind, back, { with: WITH[amoKind] }))
+              if (!client || !chosen || chosen.includes(ownerOf(raw))) rows.push(raw)
+            // One page a call: a cut between pages then never leaves a record named deleted that a later page restores.
+            if (after(more && events.length > 0, "")) return await answer(false)
             continue
           }
           return { reset: true }
         }
       } catch (error) {
         if (!(error instanceof Cut)) throw error
-        if (keyOf(spot) === keyOf(given ?? first)) throw caller.spent()
+        if (!progressed) throw caller.spent()
         return answer(false)
       }
     },
@@ -522,10 +571,10 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
               pipeline &&
               when > 0 &&
               (!chosen || chosen.includes(owners.get(item) ?? ""))
-            ) {
+            )
               items.push({ externalId, kind: "deal", item, pipeline, stage, at: when * 1000 })
-              last = Math.max(last, when)
-            }
+            // Past every event read, kept or not: a span of colleagues' moves is not read again.
+            if (when > 0) last = Math.max(last, when)
             at = { ...at, o: at.o + 1 }
           }
           if (!more || rows.length === 0) return answer(true)

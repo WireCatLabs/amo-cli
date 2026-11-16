@@ -139,26 +139,41 @@ Languages: ru, en.
   - Without it, a full round reads every lead and keeps the chosen users' own, a later round reads
     `order[updated_at]=desc` until a row older than the cursor, and a client is read one `GET` per id. This costs one
     request per client and reads colleagues' leads to drop them; the add-on is the cheaper path.
-  - Clients are read only by the ids the kept leads name, never by listing every contact or company. A lead page read
-    once is kept in memory for the overlap's 10 minutes, so the client phases reuse it instead of listing every lead
-    again.
+  - Clients are read only by the ids the kept leads name, never by listing every contact or company. A lead page is
+    kept in memory for 10 minutes under its page, its `from` and the scope. A full round's kinds share it, so they list
+    each lead page once. A later round's kinds each have their own `from` (their own cursor less 10 minutes), so each
+    usually lists the changed leads again: three short lists, not one.
   - A round overlaps the cursor by 10 minutes. Pages are numbered, so a row deleted or reassigned while a round runs
     may shift another past a page; the next round's overlap takes a recent row, not an old one. The API has no id
     range filter (`filter[id]` takes a list of ids only, Kommo `GET /api/v4/leads`), so paging by id is not possible:
-    `sync --rescan` heals a shifted old row.
+    `sync --rescan` heals a shifted old row. Nothing tells the owner when to run it.
   - A round is cut into calls of cli-core's request budget (`--max-pages`). The cursor names a spot,
-    `<phase><page>.<offset>@<round start>`: deal pages (`d`), every client when there is no scope (`a`), the chosen
-    leads' clients on a full round (`w`), changed clients (`c`), clients on changed leads (`n`) and deletions (`r`).
-    A call that runs out of requests answers what it has with the spot it reached; one that could not move refuses.
+    `<phase><page>.<offset>[.<lead>][~<id>]@<round start>`: deal pages (`d`), every client when there is no scope
+    (`a`), the chosen leads' clients on a full round (`w`), changed clients (`c`), clients on changed leads (`n`) and
+    deletions (`r`). A call that runs out of requests answers what it has with the spot it reached; one that could not
+    move refuses.
+    - `<id>` is the last row decided. The next run reads the page again and goes on after that row, so a row deleted
+      or given away between runs does not skip the next one. When the row itself is gone, the page is read again from
+      its start: a repeat, never a skip.
+    - A changed client that is not a chosen user's is kept when one of its leads is. Without the add-on each lead is
+      read by id, and a client on more leads than one run's budget is read over several runs: `<lead>` counts its
+      leads already read, none a chosen user's.
+    - Deletions are answered one events page at a time. A record an earlier page named deleted and a later page names
+      restored is read by id and saved again, which revives it in the store (cli-core's upserts clear `deleted_at`).
+  - A changed contact that is no longer the scope's (given to a colleague, or off every chosen lead) is saved once
+    more with its new assignee and without phones and e-mails; cli-core removes contacts only at the next narrowing or
+    `sync --rescan`, as b24 does. A company has no such pass and stays (open).
   - A later round still reads by id every client on a changed chosen lead, stored or not. Only a client new to the
     lead needs it; telling which needs the store's links or `*_linked` events (open).
 - Deletions come from `<entity>_deleted` and `<entity>_restored` events since the cursor; the last event of a record
   decides. Stage history comes from `lead_status_changed` events (`value_after[0].lead_status`), read whole each time
-  after the last one kept, since the event order is not documented. Under `mine` it keeps only the chosen users'
-  leads, and its cursor `h<from>.<page>.<offset>.<latest>` resumes inside a page.
+  after the last one read, since the event order is not documented. Under `mine` it keeps only the chosen users'
+  leads, its cursor moves past colleagues' moves too, and `h<from>.<page>.<offset>.<latest>` resumes inside a page.
 - `filter[type]` takes a comma string in Kommo's reference (`GET /api/v4/events`) and an array in amoCRM's
   ([events-and-notes](https://www.amocrm.ru/developers/content/crm_platform/events-and-notes)): `.amocrm.ru` hosts get
-  `filter[type][]`, others the comma string. Unchecked live (open).
+  `filter[type][]`, others the comma string. Both are the one backend, so one form likely works for both; the fake
+  takes either, so the tests prove only which form is sent. After the live check, keep the one form that works on
+  both (open).
 - Won is status 142 and lost 143 in every pipeline
   ([leads_pipelines](https://www.amocrm.ru/developers/content/crm_platform/leads_pipelines)); a lead's
   `_embedded.loss_reason` is its loss reason. Amounts are in the account's one currency.
@@ -187,9 +202,14 @@ read back. A failed read-back answers `sent: true`, so the owner syncs instead o
   set `_embedded.companies` ([leads-api](https://www.amocrm.ru/developers/content/crm_platform/leads-api)). A currency
   other than the account's, a close date and contacts are refused before any request.
 - `close` sets 142 or 143 with the deal's pipeline; `--reason` names a loss reason by name or id.
-- Contacts take a name, first and last name, owner, e-mails and phones (into the `EMAIL` and `PHONE` fields with
-  `enum_code: "WORK"`) and `--field`. `--position` is refused: amoCRM keeps a job title in an account's own field
-  with no documented code ([contacts-api](https://www.amocrm.ru/developers/content/crm_platform/contacts-api)).
+- Contacts take a name, first and last name, owner, e-mails and phones (into the `EMAIL` and `PHONE` fields) and
+  `--field`. `--position` is refused: amoCRM keeps a job title in an account's own field with no documented code
+  ([contacts-api](https://www.amocrm.ru/developers/content/crm_platform/contacts-api)).
+  - An update reads the contact first. A name part given keeps the other; a contact that holds only `name` is split
+    at its first space. A phone or e-mail kept keeps its kind (`MOB`, `HOME`…, matched by the exact text), and a new
+    one is `WORK`, as the contacts-api `PATCH` example sends it.
+  - cli-core's write contract case "an update of one field keeps the rest" sets `position`, so it is left out; amo's
+    own test makes a contact, changes its owner and checks the name and e-mail kept, and renames a company.
 - Companies take a name, owner and `--field`.
 - No write is idempotent: `request_id` is echoed back, not stored.
 
@@ -246,9 +266,9 @@ the main pipeline").
 
 ## Open
 
-- cli-base `PARITY_GROUPS` should name amo with b24 among the CRM CLIs, with the differences above (no `leads`,
-  `products`, `deals delete`). Not opened: cli-base installs group members from npm (`src/dev/family.ts`), and amo is
-  on neither npm nor GitHub yet.
+- cli-base's parity group `crm` (b24 and amo, [cli-base#590](https://github.com/WireCatLabs/cli-base/pull/590), merged) compares deals, sync,
+  search, store, schedule and account; people, organizations, users, api and session join once b24's release is on
+  cli-core's shared people and organizations commands.
 - The stored `redirectUri` is always `RELAY_URL`. It stays: it is how a sign-in made with another Redirect URI keeps
   refreshing if the page ever moves.
 - `src/amo/oauth.ts` keeps its own JSON code exchange. cli-core's `exchange` could take a JSON body option and send
@@ -256,6 +276,8 @@ the main pipeline").
 - cli-core: the OAuth keeper's lock retry (`lockRetryMs ?? 50`) and the file lock's `RETRY_MS` (20) are real waits
   that tests cannot inject.
 - A later round re-reads every client of a changed lead (see the store and sync).
+- A company given to a colleague or taken off every chosen deal stays in the copy: cli-core has no cleanup pass for
+  companies when the source names its deletions itself.
 - Live checks: the `filter[type]` form on a `.amocrm.ru` account, `mode=post_message`, a refresh after 24 hours, and
   the answer of an account without the add-on.
 - How long amoCRM keeps events is not documented: a cursor older than that misses deletions. `sync --rescan` heals it.
