@@ -821,6 +821,32 @@ amo users show <user>
 
 **Example:** `amo work users show 7`
 
+## `amo changes`
+
+what changed in the CRM's deals, leads, activities and contacts, as the syncs copied it
+
+### `amo changes list`
+
+deals and leads made, moved, won, lost and given another owner, activities added and done, and contacts added, newest first; the last day unless at: says otherwise
+
+```sh
+amo changes list [query] [options]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `query` | optional | field:value terms that narrow the list — the fields are below. |
+
+| Option | What it does |
+|---|---|
+| `--limit <n>` | changes per page, 1–500. Default: `50`. |
+| `--cursor <cursor>` | the next page, as the last answer's page.next gave it. |
+| `--format <format>` | csv: this page as a table; report: the window as a morning digest document, for schedule command. Run by a schedule, the report starts where that schedule's last one ended. One of: `csv`, `report`. |
+
+**Returns:** crm change — change, at, kind, ref, external_id, account, title, pipeline, and 10 more; every field: amo commands info changes list
+
+**Example:** `amo work changes list "at>=1d"`, `amo work changes list change:won at>=7d --json`, `amo work changes list "at>=1d" --format report`
+
 ## `amo fields`
 
 the CRM's own fields on deals, leads, people and organizations, as last synced

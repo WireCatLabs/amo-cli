@@ -541,6 +541,19 @@
     },
     {
       "path": [
+        "changes",
+        "list"
+      ],
+      "summary": "deals and leads made, moved, won, lost and given another owner, activities…",
+      "effects": {
+        "remote": "none",
+        "local": "read"
+      },
+      "permission": "changes.list",
+      "entity": "crm_change"
+    },
+    {
+      "path": [
         "fields",
         "list"
       ],
@@ -1076,6 +1089,11 @@
         "position",
         "active",
         "department_ids"
+      ]
+    },
+    "crm_change": {
+      "fields": [
+        "change"
       ]
     },
     "crm_field": {
