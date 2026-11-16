@@ -7,7 +7,7 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**149 ✅ · 45 ⛔ · 0 ❌** — 70 commands, 124 options.
+**159 ✅ · 64 ⛔ · 0 ❌** — 80 commands, 143 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
@@ -21,6 +21,10 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `session status` | `--check` | ✅ |  |
 | `session end` |  | ✅ |  |
 | `session list` |  | ✅ |  |
+| `account remove` |  | ✅ |  |
+| `account remove` | `--keep-data` | ✅ |  |
+| `account remove` | `--delete-data` | ✅ |  |
+| `account remove` | `--dry-run` | ✅ |  |
 | `sync` |  | ✅ |  |
 | `sync` | `--rescan` | ✅ |  |
 | `sync` | `--max-pages` | ✅ |  |
@@ -127,6 +131,31 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `api call` | `--params` | ✅ |  |
 | `api call` | `--body` | ✅ |  |
 | `api call` | `--dry-run` | ✅ |  |
+| `schedule command` |  | ✅ |  |
+| `schedule command` | `--every` | ✅ |  |
+| `schedule command` | `--at` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule command` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule command` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule command` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--model` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--max-cost` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--allow-dangerous` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--max-cost-per-day` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--every` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--at` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule list` |  | ✅ |  |
+| `schedule agents list` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule run` |  | ✅ |  |
+| `schedule run` | `--no-notify` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule run` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule remove` |  | ✅ |  |
+| `schedule pause` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule resume` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule exec` |  | ✅ |  |
 | `doctor` |  | ✅ |  |
 | `doctor` | `--online` | ✅ |  |
 | `doctor reports show` |  | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |

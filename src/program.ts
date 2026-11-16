@@ -19,8 +19,10 @@ import {
 import { appUpdate } from "@wirecat/cli-core/update"
 import type { Command } from "commander"
 import { appSourceOf } from "./amo/oauth.js"
+import { accountCommand } from "./commands/account.js"
 import { apiCommand } from "./commands/api.js"
 import { crmSharedCommands } from "./commands/crm-shared.js"
+import { scheduleCommand } from "./commands/schedule.js"
 import { sessionCommand } from "./commands/session.js"
 import { configuration } from "./config.js"
 import { IDENTITY, PACKAGE, SKILL } from "./identity.js"
@@ -67,18 +69,25 @@ export const definition = (): ProgramDefinition => ({
   firstScreen: {
     pitch: "an amoCRM or Kommo account's CRM for scripts and agents, with a permission on every write.",
     can: [
-      { command: "session status --check", does: "which account and user the token signs in as" },
-      { command: "api list family:leads", does: "every API v4 operation on leads, with its permission and page" },
-      { command: 'api call "GET /api/v4/leads"', does: "any operation, paced under the limit" },
-      { command: 'api show "PATCH /api/v4/leads/{id}"', does: "every permission a write checks, and its page" },
+      { command: "sync", does: "copy your deals and their contacts and companies; the next sync takes the changes" },
+      { command: "deals list status:open", does: "open deals with stage, amount and owner, from the store, offline" },
+      { command: 'search all "kitchen"', does: "stored deals beside your other WireCat tools' data" },
+      { command: "deals move <ref> <stage>", does: "move a deal; deals.move=readonly stops agents moving one" },
+      { command: 'people list "Anna"', does: "any contact, read live from the account" },
+      {
+        command: 'api call "GET /api/v4/leads" --dry-run',
+        does: "any API v4 operation, with every permission it checks",
+      },
     ],
     start: `${IDENTITY.command} work session start --host https://example.amocrm.ru`,
   },
   commands: () => [
     commandsCommand(IDENTITY),
     sessionCommand(),
+    accountCommand(),
     ...crmSharedCommands(),
     apiCommand(),
+    scheduleCommand(),
     appDoctorCommand(IDENTITY, configuration, { packageName: PACKAGE }),
     skillCommand(IDENTITY, SKILL),
     mcpCommand(),

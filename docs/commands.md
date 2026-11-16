@@ -57,7 +57,7 @@ keep this profile's amoCRM sign-in and account address in the OS keyring
 
 ### `amo session start`
 
-sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it. With --client-id it signs in through that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens act with the rights of the user who signs in. Each sign-in forgets the profile's other kind
+sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it. With --client-id it signs in through that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens act with the rights of the user who signs in; the integration's Redirect URI must be https://wirecat.dev/webhooks/apps/amo-callback. Each sign-in forgets the profile's other kind
 
 **Changes something on this computer only.**
 
@@ -108,6 +108,30 @@ amo session list
 ```
 
 **Example:** `amo session list`, `amo session list --json`
+
+## `amo account`
+
+this profile on this computer
+
+### `amo account remove`
+
+sign the profile out, then forget it on this computer: its settings, its saved sign-in and its files; --keep-data leaves its messages in the store, where search still finds them, --delete-data deletes them; asks first, or --yes
+
+**Changes something on this computer only.**
+
+```sh
+amo account remove [options]
+```
+
+| Option | What it does |
+|---|---|
+| `--keep-data` | leave what the store holds of this account, still searchable. |
+| `--delete-data` | delete what the store and the tool's own files hold of this account. |
+| `--dry-run` | list what it would remove and keep, and change nothing. |
+
+**Returns:** account removal — profile, data, dry_run, account, revoked, config_file, removed, kept; every field: amo commands info account remove
+
+**Example:** `amo personal account remove --keep-data --dry-run`, `amo personal account remove --delete-data --yes`
 
 ## `amo sync`
 
@@ -895,6 +919,187 @@ amo api call <method> [options]
 | `--dry-run` | show every permission this call checks, with its level, and call nothing. |
 
 **Example:** `amo work api call "GET /api/v4/leads" --params '{"limit":5,"with":"loss_reason"}'`, `amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run`
+
+## `amo schedule`
+
+run a amo command or an agent later or on a timer (systemd, launchd, Task Scheduler); an agent cannot send
+
+### `amo schedule command`
+
+run amo <args…> on a timer — reads save what they read, so this is how a chat's history fills the store
+
+**Changes something on this computer only.**
+
+```sh
+amo schedule command <name> <args> [options]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | required | lowercase letters, digits and dashes. |
+| `args` | required | the amo command after its name, e.g. -- messages list <chat> --limit 50. |
+
+| Option | What it does |
+|---|---|
+| `--every <duration>` | repeat: 30m, 2h, 1d. |
+| `--at <HH:MM>` | every day at this local time; 'mon 09:00' once a week, 'mon,fri 09:00' on several days (mon, tue, wed, thu, fri, sat, sun); repeat it for more times. |
+| `--at-time <time>` | one run: 30m, 2d from now, or an ISO time; the schedule removes itself after it. |
+| `--notify-on <when>` | desktop notice after a run (default failures for an agent that repeats with --every, else always). One of: `always`, `failures`, `never`. |
+| `--deliver-to <route>` | also send the result, when --notify-on says so, by the owner's own tg or mail: telegram-bot:<profile>/<chat id or user:id>, or email:<profile>/<address>; repeat it for more. |
+
+**Example:** `amo personal schedule command health --every 1h -- doctor`, `amo personal schedule command morning-check --at 08:00 -- doctor`
+
+### `amo schedule agent`
+
+start an agent (claude, codex, gemini, cursor, opencode, openclaw, hermes, grok, kimi) with a prompt on a timer; it runs with AMO_READ_ONLY=1, so it reads and drafts and cannot send, and its own limits hold it to these CLIs' commands; an agent with no such limit is refused (`schedule agents list` says which) — its answer is kept and you are notified
+
+**Changes something on this computer only.**
+
+```sh
+amo schedule agent <name> <harness> <prompt> [options]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | required | lowercase letters, digits and dashes. |
+| `harness` | required | the agent to start. One of: `claude`, `codex`, `gemini`, `cursor`, `opencode`, `openclaw`, `hermes`, `grok`, `kimi`. |
+| `prompt` | required | what to do, e.g. "summarize what came in during the last day: amo personal search messages 'date>1d' --newest --limit 20". |
+
+| Option | What it does |
+|---|---|
+| `--model <model>` | the model it runs on: an alias such as sonnet, or a model id; "" for the agent's own default (default sonnet for claude, the agent's own for the others, or the config file's). |
+| `--max-cost <usd>` | claude only: stop a run that costs more than this, in US dollars. |
+| `--allow-dangerous` | start an agent its own limits cannot hold to these CLIs' commands, where `schedule agents list` says allowed_with_ack: it may then run any program inside its sandbox. |
+| `--max-cost-per-day <usd>` | claude only, as the others report no cost: start no run for the rest of the day once its runs cost this much, in US dollars; 0 for no cap (default 5, or the config file's). |
+| `--every <duration>` | repeat: 30m, 2h, 1d. |
+| `--at <HH:MM>` | every day at this local time; 'mon 09:00' once a week, 'mon,fri 09:00' on several days (mon, tue, wed, thu, fri, sat, sun); repeat it for more times. |
+| `--at-time <time>` | one run: 30m, 2d from now, or an ISO time; the schedule removes itself after it. |
+| `--notify-on <when>` | desktop notice after a run (default failures for an agent that repeats with --every, else always). One of: `always`, `failures`, `never`. |
+| `--deliver-to <route>` | also send the result, when --notify-on says so, by the owner's own tg or mail: telegram-bot:<profile>/<chat id or user:id>, or email:<profile>/<address>; repeat it for more. |
+
+**Example:** `amo personal schedule agent review claude "review what came in overnight and draft replies" --at 08:30`, `amo personal schedule agent triage gemini "list what needs an answer today" --every 2h`, `amo personal schedule agent weekly claude "review the week's open threads" --at 09:00 --model opus`
+
+### `amo schedule list`
+
+the schedules, when they run and how their last run went
+
+```sh
+amo schedule list [query]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `query` | optional | field:value terms that narrow the list — the fields are below. |
+
+**Returns:** scheduled job — name, kind, when, last, paused, notify, deliver_to, harness, and 4 more; every field: amo commands info schedule list
+
+**Example:** `amo personal schedule list`, `amo personal schedule list kind:agent`
+
+### `amo schedule agents`
+
+the coding agents an agent schedule may start
+
+#### `amo schedule agents list`
+
+the agents a schedule may start, and which are on PATH here
+
+```sh
+amo schedule agents list [query]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `query` | optional | field:value terms; this list filters by none yet. |
+
+**Returns:** schedule harness — id, name, programs, reports_cost, restricted, restricted_reason, allowed_with_ack, installed, and 1 more; every field: amo commands info schedule agents list
+
+**Example:** `amo personal schedule agents list`, `amo personal schedule agents list --json`
+
+### `amo schedule run`
+
+run a schedule now, as its timer would, and wait for it; a paused one runs too
+
+**Changes something in the service.**
+
+```sh
+amo schedule run <name> [options]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | required | the schedule's name, as `schedule list` shows it. |
+
+| Option | What it does |
+|---|---|
+| `--no-notify` | keep the result here: send it along none of its routes. |
+| `--deliver-to <route>` | send it along only this one of its own routes; repeat it for more. |
+
+**Example:** `amo personal schedule run health`
+
+### `amo schedule remove`
+
+stop a schedule and remove its timer; its past output stays
+
+**Changes something on this computer only.**
+
+```sh
+amo schedule remove <name>
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | required | the schedule's name, as `schedule list` shows it. |
+
+**Example:** `amo personal schedule remove health`
+
+### `amo schedule pause`
+
+take a schedule off its timer and keep it; run runs it, resume puts it back
+
+**Changes something on this computer only.**
+
+```sh
+amo schedule pause <name>
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | required | the schedule's name, as `schedule list` shows it. |
+
+**Example:** `amo personal schedule pause health`
+
+### `amo schedule resume`
+
+put a paused schedule back on its timer
+
+**Changes something on this computer only.**
+
+```sh
+amo schedule resume <name>
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | required | the schedule's name, as `schedule list` shows it. |
+
+**Example:** `amo personal schedule resume health`
+
+### `amo schedule exec`
+
+what a timer runs, given the schedule's file; to run one by hand, use run
+
+**Changes something in the service.**
+
+```sh
+amo schedule exec <file> [seal]
+```
+
+| Argument | | What it is |
+|---|---|---|
+| `file` | required | the schedule's schedule.json in the state folder, as the timer passes it. |
+| `seal` | optional | the file's SHA-256 as it was saved, which the timer passes; a file that differs does not run. |
+
+**Example:** `amo personal schedule exec ~/.local/share/amo-cli/schedules/health/schedule.json`
 
 ## `amo doctor`
 

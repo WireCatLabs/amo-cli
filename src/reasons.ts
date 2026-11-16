@@ -13,6 +13,7 @@ const OWN: [reason: string, code: string, message: string][] = [
   ["account.host-missing", "configuration_error", "AMO_TOKEN needs AMO_HOST, the account's address"],
   ["session.expired", "authentication_error", "amoCRM refused the token: it expired or was revoked"],
   ["session.duplicate", "conflict", "another profile here already signs in to this account as this user"],
+  ["account-remove.account-shared", "conflict", "another profile reads the same account, whose copy the store shares"],
   ["amo.subscription-ended", "permission_error", "the amoCRM subscription has ended"],
   ["amo.access-denied", "permission_error", "the token's user may not do this in amoCRM"],
   ["amo.blocked", "permission_error", "amoCRM blocks every request from here"],
@@ -34,4 +35,4 @@ export const REASONS = defineReasons(
 )
 
 /** Detail keys amo's errors carry beyond cli-core's own. */
-export const DETAILS = ["fields", "account"]
+export const DETAILS = ["fields", "account", "profiles"]

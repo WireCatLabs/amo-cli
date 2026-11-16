@@ -15,8 +15,12 @@ command without one stops with exit code 2 and lists the profiles on this comput
 
 ## Sign in
 
-Make a private integration in amoCRM (Settings → Integrations → Create integration), open its Keys and scopes tab
-and generate a long-lived token; amoCRM shows it once. Then give the account's address and paste the token:
+Make a private integration. In amoCRM (`.amocrm.ru`): амоМаркет → ⋯ at the top left → «Создать интеграцию», with a
+name, a description, a Redirect URI (`https://wirecat.dev/webhooks/apps/amo-callback`) and «Доступ к данным аккаунта»
+ticked; save, then «Ключи» → «Сгенерировать токен», with an end date. On an account whose owner is not marked
+technical, amoCRM first asks you to sign a waiver of technical support for a private integration
+([step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)). In Kommo: Settings → Integrations →
+Create integration, then Keys and scopes → Generate a long-lived token. Either shows the token once. Then give the account's address and paste the token:
 
 ```sh
 amo work session start --host https://example.amocrm.ru
