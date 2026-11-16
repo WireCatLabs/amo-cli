@@ -8,7 +8,8 @@
       "!.claude",
       "!pnpm-lock.yaml",
       "!config/wirecat",
-      "!contracts/wirecat.json"
+      "!contracts/wirecat.json",
+      "!contracts/kommo-openapi.json"
     ]
   },
   "extends": ["./config/wirecat/biome.base.json"],
@@ -35,6 +36,16 @@
                 ]
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/amo/operations.ts", "src/testing/kommo-schemas.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
           }
         }
       }

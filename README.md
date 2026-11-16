@@ -1,15 +1,178 @@
-# amo
+# amo — amoCRM and Kommo CLI for AI agents
 
-`amo` is a WireCat command-line tool, started from
-[cli-template](https://github.com/WireCatLabs/cli-template). Its design is in
-[docs/dev/DESIGN.md](docs/dev/DESIGN.md).
+`amo` reads and changes an amoCRM or Kommo account's sales data from the terminal, from scripts and from AI agents.
+It signs in with a long-lived token from one of the account's private integrations and acts with the rights of the
+administrator who made it. Today it gives the sign-in, `doctor` and every operation of the amoCRM API v4 through
+`api call`, each with its own permission. Deals, contacts and companies in the local
+[WireCat](https://wirecat.dev) store, as `b24` has them, come next.
 
 ## Quick start
 
 ```sh
-pnpm install
-pnpm build
-node dist/bin/amo.js doctor
+npm install -g @wirecat/amo-cli
+amo skill install                                          # the agent skill, for Claude Code, Codex, Gemini CLI and OpenClaw
+amo work session start --host https://example.amocrm.ru   # paste the long-lived token; it is kept in the keyring
+amo work session status --check                            # the account and the user the token acts as
+amo work api call "GET /api/v4/leads" --params '{"limit":5}'
 ```
 
-`doctor` needs no profile. Every command that uses an account starts with one, a name you choose: `amo personal config show`.
+`https://example.amocrm.ru` is your account's address: `<subdomain>.amocrm.ru`, `<subdomain>.kommo.com` or
+`<subdomain>.amocrm.com`, kept exactly as you give it. The token comes from a private integration that an account
+administrator makes once, in amoCRM (амоМаркет → ⋯ → «Создать интеграцию») or Kommo (Settings → Integrations →
+Create integration). Every step, the browser sign-in through the same integration and which one to choose are in
+[install and connect](docs/installation.md).
+
+`work` is a profile: a name you choose for one account. It is the first word of every command that uses an account,
+and none is ever assumed. You need Node.js 22.16 or a later 22.x, or Node.js 24 or later. `amo doctor` needs no
+network and shows what is set up.
+
+More: [installation](docs/installation.md), [usage](docs/usage.md).
+
+## What you can do
+
+```sh
+amo work sync                                                  # copy your own deals and their clients
+amo work deals list status:open                                # from the copy, offline
+amo work deals close deal:12 lost --reason "Дорого"
+amo work people list "Anna"                                    # any contact, read live
+amo work api list family:leads effect:write                    # the operations on leads, with their permissions
+amo work api show "PATCH /api/v4/leads/{id}"                   # what a write checks and its reference page
+amo work api call "GET /api/v4/leads/42" --params '{"with":"loss_reason"}'
+amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run   # every permission, sent nowhere
+```
+
+`sync` copies the deals assigned to you, plus colleagues an administrator chooses, and only the contacts and
+companies on them; any other client is read live with `people` or `organizations`. Every write answers an
+`operation_id` and can be previewed with `--dry-run`. More: [usage](docs/usage.md) and the
+[command reference](docs/commands.md).
+
+## For AI agents
+
+- **An agent with a terminal** (Claude Code, Codex, Gemini CLI, OpenClaw): `amo skill install` writes the skill, the
+  agent's instruction sheet.
+- **An MCP client**: `amo work mcp serve`, or `amo work mcp add claude-code`. `mcp serve --permission api=readonly`
+  tightens the levels for one server; an agent can never loosen them.
+- **ChatGPT or Claude in a browser**: `amo work mcp serve --http` behind your own tunnel.
+
+Text from the account is marked `untrusted` in MCP answers: it is data for the agent, never instructions. `api call`
+and `session start`/`end` are never offered over MCP. With `--json`, every command prints one JSON value, and an error
+comes as JSON with a code to branch on.
+
+## Why amo
+
+- **Your CRM where your agent works.** An agent reads a lead, its contacts and the pipeline, in the terminal or over
+  MCP, with the same commands and answers as `b24` for Bitrix24.
+- **Your rules, not the agent's.** Every API operation has a permission level per profile. Notes, events and deletes
+  ask first, and the operations that message people, run Salesbots, send data to webhooks, add users, set tasks or
+  change rights are denied until you allow them.
+- **Nothing private on screen or in logs.** The token stays in the keyring and never appears in output, errors or run
+  records.
+
+## Sign-in and profiles
+
+`amo work session start --host <address>` asks for the long-lived token without showing it, or reads it from stdin,
+checks it against the account and keeps it in the system keyring with the address; `--credential-storage file` keeps
+it in a private file instead. `session status --check` shows the account and the user, `session end` forgets the
+token on this computer, and `session list` lists the profiles. A second profile on the same account and user is
+refused. For one run, `AMO_TOKEN` with `AMO_HOST` take the place of the saved sign-in.
+
+`session start --host <address> --client-id <id>` signs in through your own private integration instead: the secret
+key comes from `AMO_AMOCRM_CLIENT_SECRET` or a hidden prompt, the browser asks you to allow it, and `amo` renews the
+access token itself. Set the integration's Redirect URI to `https://wirecat.dev/webhooks/apps/amo-callback`.
+
+amoCRM has no call that revokes a token: revoke it on the integration's «Выданные доступы» tab → «Отозвать
+доступ» (Kommo: Authorization → Revoke access).
+`amo work account remove --keep-data` (or `--delete-data`) forgets the profile's sign-in and files on this computer;
+`--delete-data` also deletes the account's copy from the store, and refuses while another profile reads the same
+account. `amo work schedule command crm --every 1h -- sync` keeps the copy fresh with a timer.
+
+Tasks and notes are off by default. `amo work config set crm.amocrm:<host>.activities on` makes the next `sync` copy
+the tasks, comments and calls on your deals and their clients from the last 90 days; those on a colleague's deal are
+never stored, and a call keeps only its direction, never the phone number or the recording. `activities list` shows
+them, and `changes list` shows what changed: deals made, moved, won, lost and given another owner, tasks added and
+done, contacts added. A morning digest of the last day goes to the desktop notice, or to a chat with `--deliver-to`:
+
+```sh
+amo work schedule command crm-digest --at 08:30 -- changes list --format report
+```
+
+The digest names deal titles, amounts, contact names and task subjects, never a note's text; phone numbers and e-mail
+addresses in it are masked. Everyone who reads the route reads it.
+
+## Settings and permissions
+
+Each profile has a permission level for every operation: `allow`, `ask`, `readonly` or `deny`. Its key is the path's
+words and the verb: `GET /api/v4/leads/{id}` is `api.leads.id.get`, so `api.leads=readonly` covers every lead
+operation. What `amo`'s own commands read is allowed (leads, contacts, companies, pipelines, fields, users, the
+account, tasks and events), and so are creating and changing leads, contacts and companies. Every other read,
+such as notes or unsorted, asks, and so do other writes and every delete. Conversations, chats,
+Salesbots, webhooks, widgets, website buttons, calls and switching users on or off are denied, reads too; so are adding
+users and writing tasks, roles and lead sources. `api call` also checks the key of the command that does the same
+thing, such as `deals.update` for `PATCH /api/v4/leads`, and `crm.assign-others`, denied, when a write hands a record,
+a task or a nested contact to another user.
+
+Some things only the account's administrator does through `amo`, whatever the permissions say: deleting, setting a
+field to nothing, unlinking records, and reading contacts, companies, notes and events through `api call` (your own
+clients come with sync; another one with `people show`, 100 a day).
+
+**Over MCP `ask` does not ask: the write goes ahead**, since no one is there to answer. `AMO_READ_ONLY=1` refuses
+every write.
+
+More: [settings](docs/configuration.md), [security](docs/security.md).
+
+## Limits
+
+- amoCRM allows 7 requests a second per integration and 50 per account; `amo` keeps to 5 a second for every `amo`
+  process on the account, and waits out a 429 up to 30 seconds.
+- A 402 means the subscription has ended: writes stop at once, reads 30 days later.
+- A 403 without a JSON body means amoCRM blocks every request from here; stop and check the account.
+- amoCRM has no idempotency key: after an `outcome_unknown`, look at the record before you write it again.
+- API v4 cannot delete a deal, so there is no `deals delete`; a contact's job title is an account field, set with
+  `--field`, not `--position`.
+- Without amoCRM's paid API filter add-on, `sync` reads a contact or company one request at a time, and `people list`
+  and `organizations list` cannot narrow by owner or time; a search by words still works.
+- `api call` takes only the operations of the amoCRM API v4 reference (`api list`); the Chats API, Drive and the AI
+  agent API live on other hosts and are not reached.
+- Tested against a fake account built from the Kommo API reference, not yet against a live account.
+- Before 1.0, a minor version may change commands, `--json` fields and MCP tools; the changelog lists each such
+  change under "may break callers".
+
+## Security
+
+The token is the password: anyone who has it can do what its administrator can. `amo` keeps it in the system keyring
+and never prints it, in output, errors or run records. Report a vulnerability as [SECURITY.md](SECURITY.md) says.
+
+## When it does not work
+
+Start with `amo doctor`, then [troubleshooting](docs/troubleshooting.md).
+
+## Documentation
+
+- [Install and connect](docs/installation.md) · [Use it](docs/usage.md) · [Settings](docs/configuration.md) ·
+  [Security](docs/security.md) · [Commands](docs/commands.md) · [Troubleshooting](docs/troubleshooting.md)
+- The design: [docs/dev/DESIGN.md](docs/dev/DESIGN.md).
+
+## Part of WireCat
+
+`amo` is one of the [WireCat](https://wirecat.dev) tools. They share one local store, so `search all` and an agent see
+your CRM beside your messages, mail, notes and meetings.
+
+## Development
+
+You need Node.js 22.16 or a later 22.x, or Node.js 24 or later, and pnpm.
+
+```sh
+pnpm install
+pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm docs:check
+pnpm build && pnpm smoke
+```
+
+Tests use a fake account whose routes come from the Kommo OpenAPI in `contracts/kommo-openapi.json`, invented records,
+an injected keyring and temporary folders; nothing reaches a real account. `pnpm kommo:fetch` fetches the reference
+again, and `pnpm generate` rebuilds the operation table from it. `pnpm release:check` runs every check a release needs.
+
+More: [testing](docs/dev/TESTING.md), [design](docs/dev/DESIGN.md), [test matrix](docs/dev/test-matrix.md).
+
+## License
+
+[Apache-2.0](LICENSE).

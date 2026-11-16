@@ -13,16 +13,21 @@ import {
   type RunOptions,
   run as runShared,
   runsCommand,
+  setupCommand,
   skillCommand,
   upgradeCommand,
 } from "@wirecat/cli-core/cli"
 import { appUpdate } from "@wirecat/cli-core/update"
 import type { Command } from "commander"
-import { commentsCommand } from "./commands/comments.js"
+import { appSourceOf } from "./amo/oauth.js"
+import { accountCommand } from "./commands/account.js"
+import { apiCommand } from "./commands/api.js"
+import { crmSharedCommands } from "./commands/crm-shared.js"
+import { scheduleCommand } from "./commands/schedule.js"
 import { sessionCommand } from "./commands/session.js"
 import { configuration } from "./config.js"
 import { IDENTITY, PACKAGE, SKILL } from "./identity.js"
-import { SERVICE } from "./sample/transport.js"
+import { amoSetup } from "./setup/flow.js"
 
 const update = appUpdate({
   packageName: PACKAGE,
@@ -38,23 +43,53 @@ const update = appUpdate({
 
 const mcpCommand = () =>
   appMcpCommand(IDENTITY, configuration, {
-    name: SERVICE,
-    // SAMPLE: name the kinds of text other people wrote that your answers carry (WC-MCP-11).
-    untrusted: ["comment text", "author names"],
-    permissionExample: "comments.create=deny",
+    name: "amoCRM",
+    untrusted: [
+      "lead, contact and company names",
+      "pipeline and stage names",
+      "names of users",
+      "custom field values, notes and tags",
+      "phone numbers, e-mail addresses and links",
+      "whatever api call returns",
+    ],
+    permissionExample: "deals.close=deny",
     skill: SKILL,
-    signedIn: (profile, env, keyring) =>
-      new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) }).signedIn(profile),
+    signedIn: (profile, env, keyring) => {
+      if (new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) }).signedIn(profile)) return true
+      try {
+        return appSourceOf(env, profile, keyring) !== undefined
+      } catch {
+        return false
+      }
+    },
   })
 
 export const definition = (): ProgramDefinition => ({
   app: IDENTITY,
   // The whole object: cli-core refuses a command by its key only when it gets the permission table too.
   configuration,
+  firstScreen: {
+    pitch: "an amoCRM or Kommo account's CRM for scripts and agents, with a permission on every write.",
+    can: [
+      { command: "sync", does: "copy your deals and their contacts and companies; the next sync takes the changes" },
+      { command: "deals list status:open", does: "open deals with stage, amount and owner, from the store, offline" },
+      { command: 'search all "kitchen"', does: "stored deals beside your other WireCat tools' data" },
+      { command: "deals move <ref> <stage>", does: "move a deal; deals.move=readonly stops agents moving one" },
+      { command: 'people list "Anna"', does: "any contact, read live from the account" },
+      {
+        command: 'api call "GET /api/v4/leads" --dry-run',
+        does: "any API v4 operation, with every permission it checks",
+      },
+    ],
+    start: `${IDENTITY.command} work session start --host https://example.amocrm.ru`,
+  },
   commands: () => [
     commandsCommand(IDENTITY),
     sessionCommand(),
-    commentsCommand(),
+    accountCommand(),
+    ...crmSharedCommands(),
+    apiCommand(),
+    scheduleCommand(),
     appDoctorCommand(IDENTITY, configuration, { packageName: PACKAGE }),
     skillCommand(IDENTITY, SKILL),
     mcpCommand(),
@@ -65,6 +100,7 @@ export const definition = (): ProgramDefinition => ({
       install: (argv) => update.runUpdate(argv, {}),
     })),
     configCommand(IDENTITY, configuration),
+    setupCommand(amoSetup),
     runsCommand(IDENTITY),
   ],
 })

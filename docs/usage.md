@@ -7,11 +7,42 @@ This page explains how a command is built, and how an agent uses the tool. Read 
 A profile is a name you choose for one account. It is the first word of every command that uses an account:
 
 ```sh
-amo personal config show
+amo work config show
 ```
 
-`AMO_PROFILE=personal` does the same for one shell session. No profile is ever assumed, not even the only one: a
+`AMO_PROFILE=work` does the same for one shell session. No profile is ever assumed, not even the only one: a
 command without one stops with exit code 2 and lists the profiles on this computer.
+
+## Sign in
+
+Make the account's private integration and sign the profile in as [install and connect](installation.md) shows,
+with a key or through the integration in the browser. `amo work session status --check` shows the account and the
+user a profile acts as.
+
+## The first sync
+
+`sync` copies the deals assigned to you, plus colleagues an administrator chooses, and only the contacts and
+companies on them, into the local WireCat store. Commands such as `deals list` then read that copy offline:
+
+```sh
+amo work sync
+amo work deals list status:open
+```
+
+Any other client is read live with `people` or `organizations`. Run `sync` again to bring the copy up to date;
+`amo work schedule command crm --every 1h -- sync` does it with a timer.
+
+## Call the API
+
+`amo work api list` lists every operation of the amoCRM API v4, named `<HTTP verb> <path>`, with its permission key
+and the reference page. `api call` sends one, the query and the body as JSON:
+
+```sh
+amo work api call "GET /api/v4/leads" --params '{"limit":5,"with":"loss_reason"}'
+amo work api call "PATCH /api/v4/leads/42" --body '{"price":1000}' --dry-run
+```
+
+`--dry-run` shows every permission the call checks and sends nothing.
 
 ## Output for scripts
 
@@ -22,18 +53,18 @@ on. The [command reference](commands.md) lists the codes.
 
 `amo skill install` puts the tool's skill where Claude Code, Codex, Gemini CLI and OpenClaw look for it.
 `amo skill install --for hermes` also adds that folder to Hermes Agent's own settings, so a bare `skill install`
-leaves Hermes out. `amo personal mcp serve` serves the profile's commands over MCP, on stdin and stdout:
+leaves Hermes out. `amo work mcp serve` serves the profile's commands over MCP, on stdin and stdout:
 
 ```sh
-claude mcp add amo -- amo personal mcp serve
+claude mcp add amo -- amo work mcp serve
 ```
 
 The server offers every command, the ones that write included. The profile's permissions decide what runs; see
 [settings](configuration.md#permissions).
 
 For ChatGPT and Claude in the browser,
-`amo personal mcp serve --http --public-url https://laptop.example.ts.net` serves on `127.0.0.1` (port 8765, or
+`amo work mcp serve --http --public-url https://laptop.example.ts.net` serves on `127.0.0.1` (port 8765, or
 `--port`) behind your own tunnel. A browser app logs in with a one-time code that the command prints;
-`amo personal mcp revoke` ends every login. `amo personal mcp server start` runs the same
+`amo work mcp revoke` ends every login. `amo work mcp server start` runs the same
 server in the background, `mcp server status` shows its port, the login code and the apps logged in, and
 `mcp server stop` ends it.

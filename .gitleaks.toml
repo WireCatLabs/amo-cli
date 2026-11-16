@@ -1,8 +1,15 @@
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 paths = ['''pnpm-lock\.yaml''']
+
+# The Kommo reference pages show one sample JWT (account 77777777, issued in 1993) in their token examples; it is
+# allowed by its signature, so any other token in the vendor's file is still caught.
+[[allowlists]]
+targetRules = ["jwt"]
+regexTarget = "secret"
+regexes = ['''\.[A-Za-z0-9_-]*i2q1u1EG-au_TZhmmXK8\\?$''']
 
 # gitleaks' own rules know Google API keys (AIza…) only. Google calls its OAuth tokens opaque, so these prefixes are
 # the observed format, not a promised one: ya29. in Apigee's sample access token, 1// in the sample refresh token of
@@ -21,3 +28,40 @@ regex = '''(?:^|[^A-Za-z0-9/])(1//[A-Za-z0-9_-]{30,})'''
 secretGroup = 1
 entropy = 3.5
 keywords = ["1//"]
+
+# A CRM holds its clients' phone numbers and e-mail addresses; neither may reach a fixture, a doc or a capture (b24's
+# rules, WC-SECR-17). The fake's phones are +7 900 000-00-0x and its addresses @example.test.
+[[rules]]
+id = "phone-number-e164"
+description = "A phone number of a contact, a company or an employee"
+regex = '''(?i)(?:phone|msisdn|number)["'\s:=]{1,10}\+?[1-9]\d{9,14}'''
+tags = ["pii"]
+
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+  '''\+?7900000000\d''',
+  # The Kommo reference pages' sample numbers: 555 is the US range kept for fiction.
+  '''\+?14155551234''',
+  '''\+?1223334444''',
+  '''"1234567890''',
+]
+
+[[rules]]
+id = "email-address"
+description = "An e-mail address of a contact, a company or an employee"
+regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b'''
+tags = ["pii"]
+
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = [
+  # The domains RFC 2606 and RFC 6761 keep for examples, and the addresses of tools that commit here.
+  '''@(?:[A-Za-z0-9-]+\.)*(?:example\.(?:com|org|net)|example|test|invalid|localhost)$''',
+  '''@wirecat\.dev$''',
+  '''@example\.(?:amocrm\.(?:ru|com)|kommo\.com)$''',
+  # The Kommo reference pages' sample company address.
+  '''^support@atlas\.com$''',
+  '''^noreply@anthropic\.com$''',
+  '''@users\.noreply\.github\.com$''',
+]

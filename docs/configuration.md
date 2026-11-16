@@ -4,9 +4,9 @@ Settings live in one file, `config.json`, in the folder `amo doctor` shows. Each
 and `defaults` apply to every profile. This page lists how to see and change them.
 
 ```sh
-amo personal config show
-amo personal config set limit 50
-amo personal config unset limit
+amo work config show
+amo work config set limit 50
+amo work config unset limit
 ```
 
 `config show` lists each setting and where it came from: the file, a variable or the default.
@@ -21,6 +21,6 @@ the permissions say.
 
 A command that fails is kept as a run, for `amo runs list` and `runs show`. A command you add that does its work
 in `context.run` is kept when it succeeds too, unless `record` is `false` (then only failures) or it ran with
-`--no-record`. `comments` and `session status --check` do their work in a run, so `--record` keeps them. `record_input` decides whether a run
+`--no-record`. `api call` and `session status --check` do their work in a run, so `--record` keeps them. `record_input` decides whether a run
 keeps the words you typed; it is `true` unless you set it to `false`. Secrets are masked either way; see
 [Security](security.md).

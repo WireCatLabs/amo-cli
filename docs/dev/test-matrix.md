@@ -7,27 +7,172 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**71 ✅ · 24 ⛔ · 0 ❌** — 34 commands, 61 options.
+**182 ✅ · 64 ⛔ · 0 ❌** — 86 commands, 160 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
 | `commands` |  | ✅ |  |
 | `commands info` |  | ✅ |  |
 | `session start` |  | ✅ |  |
+| `session start` | `--host` | ✅ |  |
+| `session start` | `--client-id` | ✅ |  |
 | `session start` | `--credential-storage` | ✅ |  |
 | `session status` |  | ✅ |  |
 | `session status` | `--check` | ✅ |  |
 | `session end` |  | ✅ |  |
 | `session list` |  | ✅ |  |
-| `comments list` |  | ✅ |  |
-| `comments list` | `--limit` | ✅ |  |
-| `comments list` | `--page` | ✅ |  |
-| `comments list` | `--all` | ✅ |  |
-| `comments show` |  | ✅ |  |
-| `comments create` |  | ✅ |  |
-| `comments create` | `--text` | ✅ |  |
-| `comments update` |  | ✅ |  |
-| `comments update` | `--text` | ✅ |  |
+| `account remove` |  | ✅ |  |
+| `account remove` | `--keep-data` | ✅ |  |
+| `account remove` | `--delete-data` | ✅ |  |
+| `account remove` | `--dry-run` | ✅ |  |
+| `sync` |  | ✅ |  |
+| `sync` | `--rescan` | ✅ |  |
+| `sync` | `--max-pages` | ✅ |  |
+| `store status` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store apply` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store apply` | `--yes` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store info` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store check` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store migrate` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store rebuild` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store backup` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store backup` | `--encrypt` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store restore` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store decrypt` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store decrypt` | `--output` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store repair` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store repair` | `--dry-run` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store reset` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store reset` | `--no-backup` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store reset` | `--dry-run` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store copies delete` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store tables list` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store recover` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `store recover run` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
+| `deals list` |  | ✅ |  |
+| `deals list` | `--limit` | ✅ |  |
+| `deals list` | `--page` | ✅ |  |
+| `deals list` | `--format` | ✅ |  |
+| `deals show` |  | ✅ |  |
+| `deals create` |  | ✅ |  |
+| `deals create` | `--title` | ✅ |  |
+| `deals create` | `--pipeline` | ✅ |  |
+| `deals create` | `--stage` | ✅ |  |
+| `deals create` | `--amount` | ✅ |  |
+| `deals create` | `--currency` | ✅ |  |
+| `deals create` | `--close-date` | ✅ |  |
+| `deals create` | `--owner` | ✅ |  |
+| `deals create` | `--field` | ✅ |  |
+| `deals update` |  | ✅ |  |
+| `deals update` | `--title` | ✅ |  |
+| `deals update` | `--pipeline` | ✅ |  |
+| `deals update` | `--stage` | ✅ |  |
+| `deals update` | `--amount` | ✅ |  |
+| `deals update` | `--currency` | ✅ |  |
+| `deals update` | `--close-date` | ✅ |  |
+| `deals update` | `--owner` | ✅ |  |
+| `deals update` | `--field` | ✅ |  |
+| `deals move` |  | ✅ |  |
+| `deals close` |  | ✅ |  |
+| `deals close` | `--reason` | ✅ |  |
+| `pipelines list` |  | ✅ |  |
+| `pipelines show` |  | ✅ |  |
+| `pipelines show` | `--since-time` | ✅ |  |
+| `pipelines show` | `--until-time` | ✅ |  |
+| `stages list` |  | ✅ |  |
+| `people list` |  | ✅ |  |
+| `people list` | `--limit` | ✅ |  |
+| `people list` | `--page` | ✅ |  |
+| `people list` | `--format` | ✅ |  |
+| `people show` |  | ✅ |  |
+| `people create` |  | ✅ |  |
+| `people create` | `--name` | ✅ |  |
+| `people create` | `--first-name` | ✅ |  |
+| `people create` | `--last-name` | ✅ |  |
+| `people create` | `--position` | ✅ |  |
+| `people create` | `--email` | ✅ |  |
+| `people create` | `--phone` | ✅ |  |
+| `people create` | `--owner` | ✅ |  |
+| `people create` | `--field` | ✅ |  |
+| `people update` |  | ✅ |  |
+| `people update` | `--name` | ✅ |  |
+| `people update` | `--first-name` | ✅ |  |
+| `people update` | `--last-name` | ✅ |  |
+| `people update` | `--position` | ✅ |  |
+| `people update` | `--email` | ✅ |  |
+| `people update` | `--phone` | ✅ |  |
+| `people update` | `--owner` | ✅ |  |
+| `people update` | `--field` | ✅ |  |
+| `organizations list` |  | ✅ |  |
+| `organizations list` | `--limit` | ✅ |  |
+| `organizations list` | `--page` | ✅ |  |
+| `organizations list` | `--format` | ✅ |  |
+| `organizations show` |  | ✅ |  |
+| `organizations create` |  | ✅ |  |
+| `organizations create` | `--name` | ✅ |  |
+| `organizations create` | `--email` | ✅ |  |
+| `organizations create` | `--phone` | ✅ |  |
+| `organizations create` | `--owner` | ✅ |  |
+| `organizations create` | `--field` | ✅ |  |
+| `organizations update` |  | ✅ |  |
+| `organizations update` | `--name` | ✅ |  |
+| `organizations update` | `--email` | ✅ |  |
+| `organizations update` | `--phone` | ✅ |  |
+| `organizations update` | `--owner` | ✅ |  |
+| `organizations update` | `--field` | ✅ |  |
+| `users list` |  | ✅ |  |
+| `users list` | `--limit` | ✅ |  |
+| `users list` | `--page` | ✅ |  |
+| `users show` |  | ✅ |  |
+| `activities list` |  | ✅ |  |
+| `activities list` | `--limit` | ✅ |  |
+| `activities list` | `--page` | ✅ |  |
+| `changes list` |  | ✅ |  |
+| `changes list` | `--limit` | ✅ |  |
+| `changes list` | `--cursor` | ✅ |  |
+| `changes list` | `--format` | ✅ |  |
+| `fields list` |  | ✅ |  |
+| `fields list` | `--limit` | ✅ |  |
+| `fields list` | `--page` | ✅ |  |
+| `fields list` | `--all` | ✅ |  |
+| `search all` |  | ✅ |  |
+| `search all` | `--only` | ✅ |  |
+| `search all` | `--source` | ✅ |  |
+| `search all` | `--limit` | ✅ |  |
+| `search all` | `--page` | ✅ |  |
+| `search all` | `--exact` | ✅ |  |
+| `search all` | `--timezone` | ✅ |  |
+| `api list` |  | ✅ |  |
+| `api show` |  | ✅ |  |
+| `api call` |  | ✅ |  |
+| `api call` | `--params` | ✅ |  |
+| `api call` | `--body` | ✅ |  |
+| `api call` | `--dry-run` | ✅ |  |
+| `schedule command` |  | ✅ |  |
+| `schedule command` | `--every` | ✅ |  |
+| `schedule command` | `--at` | ✅ |  |
+| `schedule command` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule command` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule command` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--model` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--max-cost` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--allow-dangerous` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--max-cost-per-day` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--every` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--at` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule agent` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule list` |  | ✅ |  |
+| `schedule agents list` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule run` |  | ✅ |  |
+| `schedule run` | `--no-notify` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule run` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule remove` |  | ✅ |  |
+| `schedule pause` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule resume` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
+| `schedule exec` |  | ✅ |  |
 | `doctor` |  | ✅ |  |
 | `doctor` | `--online` | ✅ |  |
 | `doctor reports show` |  | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |
@@ -79,6 +224,12 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `config migrate` |  | ✅ |  |
 | `config repair` |  | ✅ |  |
 | `config repair` | `--dry-run` | ✅ |  |
+| `setup` |  | ⛔ | cli-core's setupCommand asks the flow's questions in a terminal; its setup-command tests drive that, and src/setup/flow.test.ts runs this flow through setup apply and setup run apply |
+| `setup show` |  | ✅ |  |
+| `setup apply` |  | ✅ |  |
+| `setup apply` | `--dry-run` | ✅ |  |
+| `setup run` |  | ✅ |  |
+| `setup run` | `--answer-stdin` | ✅ |  |
 | `runs list` |  | ✅ |  |
 | `runs list` | `--limit` | ✅ |  |
 | `runs list` | `--page` | ✅ |  |

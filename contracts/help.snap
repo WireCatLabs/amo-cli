@@ -1,19 +1,30 @@
-amo — a new WireCat CLI, started from cli-template
+amo — an amoCRM or Kommo account's CRM for scripts and agents, with a permission on every write.
 
 Usage: amo <profile> <command> [options]
 Account commands start with your profile, a name you choose; none is ever assumed.
 
-Works with:
-  tg                      Telegram in the same local store: search, review and tasks offline
-  max                     MAX in the same local store: search, review and tasks offline
-  wa                      WhatsApp in the same local store: search, review and tasks offline
-  zm                      Zoom meetings: transcripts and summaries, searchable with your other WireCat data
-  drive                   Google Drive and Docs as local text, searchable with your other WireCat data
-  gcal                    Google Calendar events, searchable with your other WireCat data
-  memo context <person>   one person across messengers, mail, notes and meetings
-  mail                    IMAP mail in the same local store: search your mailbox offline, next to your other WireCat data
-  b24                     Bitrix24 CRM: deals, leads and pipelines, searchable with your other WireCat data
+What you can do:
+  sync                                    copy your deals and their contacts and companies; the next sync takes the changes
+  deals list status:open                  open deals with stage, amount and owner, from the store, offline
+  search all "kitchen"                    stored deals beside your other WireCat tools' data
+  deals move <ref> <stage>                move a deal; deals.move=readonly stops agents moving one
+  people list "Anna"                      any contact, read live from the account
+  api call "GET /api/v4/leads" --dry-run  any API v4 operation, with every permission it checks
 
-Next:         amo commands      every command, by section
-              amo help options  output, offline, timeouts, dry run
-For agents:   amo skill show    rules and the discovery loop
+Works with:
+  tg                                      Telegram in the same local store: search, review and tasks offline
+  max                                     MAX in the same local store: search, review and tasks offline
+  wa                                      WhatsApp in the same local store: search, review and tasks offline
+  zm                                      Zoom meetings: transcripts and summaries, searchable with your other WireCat data
+  drive                                   Google Drive and Docs as local text, searchable with your other WireCat data
+  gcal                                    Google Calendar events, searchable with your other WireCat data
+  memo context <person>                   one person across messengers, mail, notes and meetings
+  mail                                    IMAP mail in the same local store: search your mailbox offline, next to your other WireCat data
+  b24                                     Bitrix24 CRM: deals, leads and pipelines, searchable with your other WireCat data
+  pbx                                     Asterisk PBX calls and recordings, searchable with your other WireCat data
+  notion                                  Notion pages and databases as local text, searchable with your other WireCat data
+
+Start here:   amo work session start --host https://example.amocrm.ru  (any profile name works)
+Next:         amo commands                                             every command, by section
+              amo help options                                         output, offline, timeouts, dry run
+For agents:   amo skill show                                           rules and the discovery loop

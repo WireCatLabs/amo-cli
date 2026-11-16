@@ -3,20 +3,23 @@
 What WireCat CLIs share — the keyring, permissions, MCP and what never reaches a log — is on the
 [shared security page](https://wirecat.dev/en/docs/security). This page keeps only what is particular to `amo`.
 
-`amo` keeps its settings in `config.json` and its state in the folders `amo doctor` shows. Its one service is
-the sample, Example Comments, whose address never resolves. `session start` keeps the service's token in the OS
-keyring, or in a private file where no keyring works; the token goes only into the request's Authorization header,
-never into an address, an answer, a run record or the send journal.
+`amo` keeps its settings in `config.json` and its state in the folders `amo doctor` shows. `session start` keeps
+the account's long-lived token and address in the OS keyring, or in a private file where no keyring works; the token
+goes only into the request's Authorization header, never into an address, an answer, a run record or the send journal.
+`amo` reaches only the account you signed in to, a host under `amocrm.ru`, `amocrm.com` or `kommo.com`, and never
+follows a redirect. amoCRM has no call that revokes a token: after a leak, revoke it on the integration's
+«Выданные доступы» tab (Kommo: Authorization), as [install and connect](installation.md#sign-out-and-revoke-access)
+shows.
 
-`amo personal mcp serve --http` listens on `127.0.0.1` only, for browser apps that reach it through your own
+`amo work mcp serve --http` listens on `127.0.0.1` only, for browser apps that reach it through your own
 tunnel. Each app logs in with a one-time code, and the server keeps a hash of each login it gives, in the state
-folder, readable by you only. `amo personal mcp revoke` forgets every one of them.
+folder, readable by you only. `amo work mcp revoke` forgets every one of them.
 
 A run record keeps the command line as you typed it, so `amo runs show` tells you what was run. A secret is still
 stored as `[redacted]`: an option named like a token or password, a password in a link, a long opaque string. A
 phone number is replaced by `[redacted]` inside the word you typed, message text included: one written with its "+" and
 country code, or 11 to 15 digits in a row, so a long id of that length is hidden as well. To keep none of the words
-you type, run `amo personal config set record_input false`.
+you type, run `amo work config set record_input false`.
 
 A secret is also found by what it looks like, in a run record and in a kept error message: a token in a known
 format (GitHub, OpenAI, Slack, AWS, Stripe, npm and the like), a `Bearer` credential, a random-looking string of 20 or
