@@ -9,12 +9,25 @@ import { permissions } from "../config.js"
 import { contextOf, signInOf, storedSignIn, transportFor } from "../context.js"
 import { AMO_WRITES } from "../crm/writer.js"
 import { IDENTITY } from "../identity.js"
+import { accountUser } from "../whoami.js"
 
 /** The selected profile's account for one command; cli-core closes the store before the answer prints. */
-/** A sign-in that cannot be read limits the reads to nobody's deals; the request that needs it says why. */
-const userOf = (command: Command): string | null => {
+/**
+ * A sign-in that cannot be read limits the reads to nobody's deals; the request that needs it says why. `AMO_TOKEN`
+ * names no user, so the account says whose it is, once per command, as session start asks; kept nowhere. Offline, or
+ * refused, it stays nobody's.
+ */
+const userOf = async (command: Command, amo: () => AmoTransport): Promise<string | null> => {
+  let signIn: ReturnType<typeof storedSignIn>
   try {
-    return storedSignIn(command)?.userId ?? null
+    signIn = storedSignIn(command)
+  } catch {
+    return null
+  }
+  if (!signIn || signIn.userId) return signIn?.userId ?? null
+  if (contextOf(command).tokens.read(contextOf(command).profile)?.source !== "environment") return null
+  try {
+    return (await accountUser(amo())).user.id || null
   } catch {
     return null
   }
@@ -53,17 +66,17 @@ const openProfile = async (command: Command, { readOnly }: { readOnly: boolean }
     }
   }
   const crm = () => (source ??= amoCrmSource(amo, { asked }))
+  const user = await userOf(command, amo)
   return {
     profile,
     account,
-    // From the saved sign-in, so an offline read needs no network; AMO_TOKEN names no user.
-    user: userOf(command),
+    user,
     store,
     env,
     locked: Boolean(env[`${IDENTITY.envPrefix}_PROFILE_LOCK`]),
     source: crm,
     writes: () => {
-      const { userId } = signInOf(command)
+      const userId = signInOf(command).userId ?? user ?? undefined
       return {
         writer: amoCrmWriter(amo, crm()),
         app: IDENTITY,

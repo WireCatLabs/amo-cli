@@ -33,6 +33,32 @@ How the tests run, and what they never touch. The rules are the handbook's
 - `pnpm smoke` installs the packed package into a temporary folder and runs it offline.
 - `pnpm audit:commands` audits the command tree beside the latest published WireCat CLIs.
 
+## Live check
+
+`bin/release` publishes only a commit that ran against a real amoCRM account
+([WC-REL-17](https://github.com/WireCatLabs/cli-base/blob/main/docs/standards/releases.md)): `pnpm exec cli-dev live
+check` looks for its line in `docs/dev/live-checks.txt`. The owner runs `bin/amo-live`:
+
+- Store the long-lived token once:
+  `secret-tool store --label="amo <account>" service amo account <account>`. It asks for the token.
+- `bin/amo-live <account> --host https://example.amocrm.ru` builds this checkout and reads only: sign-in, `doctor`,
+  two syncs, pipelines, stages, deals, people, organizations, users, changes, CSV and search. It also logs the
+  answers to the [live questions](DESIGN.md#open-questions-for-the-owner): `filter[updated_at]` on leads, tasks and
+  notes, the order of events, which event types each `filter[type]` form returns, and a by-id read of a deleted lead.
+  The run fails if the form the sync sends for this address returns other event types.
+- `--write` also creates one deal "WireCat test …", renames it, moves it and closes it as lost. The API v4 cannot
+  delete a lead, so the deal stays in the account, closed. The script then syncs again, reads the deal by its id to
+  check it is closed, and searches the account for any open test deal. When every step passed, it runs
+  `cli-dev live record`. Commit the new line of `live-checks.txt` in the release pull request.
+- `AMO_NONADMIN_ACCOUNT=<account2>` also signs in with a non-administrator's token. It checks that this user's copy
+  holds only their own deals, and that `users show` gets a clear refusal (403).
+
+Each run gets a throwaway folder for config, state and a store per profile, so the real store is never opened. The
+CLI cannot reach the keyring (`DBUS_SESSION_BUS_ADDRESS=disabled:`). The token goes in on stdin to
+`session start --credential-storage file`, inside that folder, the way a person signs in. The script sets no
+owner-only setting, so it also runs inside an agent's terminal. The log is kept in `~/.cache/amo-live/<time>.log`. It holds refs, ids, stage names, statuses and counts,
+but never a client's name or the token.
+
 ## The bundle a user installs
 
 `pnpm build` compiles `src/` with `tsc`, then cli-base's `cli-dev bundle`
