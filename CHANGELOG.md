@@ -2,6 +2,15 @@
 
 Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
+## 0.1.1 — 18.11.2026
+
+### Fixed
+
+- Published from GitHub Actions with npm provenance, so WireCat Desktop installs it: Desktop refuses a built-in tool's
+  release that its own repository's workflow did not build, and 0.1.0 was published from a computer.
+- The user docs match bitrix24-cli's: MCP and permissions pages, a full start page, `amo <profile> setup` in the
+  README's quick start, environment variables in the configuration page, and more troubleshooting rows.
+
 ## 0.1.0 — 17.11.2026
 
 ### Added

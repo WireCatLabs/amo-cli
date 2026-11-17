@@ -61,9 +61,9 @@ never stored, and a call keeps only its direction, never the phone number or the
 
 ## Phones and e-mails
 
-A contact on the user's own deals comes with its phones and e-mails. For a user who is not an administrator, amoCRM
-may limit how many other contacts can be opened in a day; `crm.foreign-contacts-spent` says the day's reads are
-spent. Show only the one the task needs. `api call` refuses to anyone but an administrator every read of contacts, companies,
+A contact on the user's own deals comes with its phones and e-mails. A user who is not an administrator sees those of
+at most 100 other contacts and companies a UTC day, counted by `amo` on this computer; `crm.foreign-contacts-spent`
+says the day's reads are spent. Show only the one the task needs. `api call` refuses to anyone but an administrator every read of contacts, companies,
 notes, events and unsorted, and a deal read that embeds its contacts (`crm.client-reads-admin-only`): they hold
 clients' phones and e-mails. Do not retry it; tell the owner.
 

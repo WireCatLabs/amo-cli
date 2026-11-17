@@ -81,5 +81,6 @@ operation's level.
 
 Writing tasks and notes has no command: it goes through `api call`, and task writes are denied by default. Chats,
 Salesbot, webhooks, widgets and calls are denied, reads too, until the owner allows them. The Chats API, Drive and
-amoCRM's AI agent API live on other hosts, and `amo` does not reach them. Reading tasks, comments and calls on deals
+amoCRM's AI agent API live on other hosts, and `amo` does not reach them. Files on deals and contacts are not
+supported yet. Reading tasks, comments and calls on deals
 is in [reading.md](reading.md).

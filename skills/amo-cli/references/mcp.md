@@ -34,5 +34,5 @@ amo work config set permissions.deals.close deny
 
 At a terminal `ask` still asks.
 
-Guides for people: [use it](https://github.com/WireCatLabs/amo-cli/blob/main/docs/usage.md#agents),
-[settings and permissions](https://github.com/WireCatLabs/amo-cli/blob/main/docs/configuration.md#permissions).
+Guides for people: [MCP](https://github.com/WireCatLabs/amo-cli/blob/main/docs/mcp.md),
+[permissions](https://github.com/WireCatLabs/amo-cli/blob/main/docs/permissions.md).

@@ -13,19 +13,39 @@ the hosts it reaches, and the browser login over MCP.
 **On this page:**
 
 1. [The token and the account](#the-token-and-the-account)
-2. [MCP in the browser](#mcp-in-the-browser)
-3. [Run records](#run-records)
-4. [Settings files](#settings-files)
+2. [Clients' phones and e-mails](#clients-phones-and-e-mails)
+3. [api call](#api-call)
+4. [MCP in the browser](#mcp-in-the-browser)
+5. [Run records](#run-records)
+6. [Settings files](#settings-files)
 
 ## The token and the account
 
 `amo` keeps its settings in `config.json` and its state in the folders `amo doctor` shows. `session start` keeps
-the account's long-lived token and address in the OS keyring, or in a private file where no keyring works. The token
+the account's long-lived token and address in the OS keyring (service `amo-cli`, account `token:<profile>`), or in a
+private file where no keyring works. A sign-in through the integration is kept in the same place (account
+`oauth:amocrm:<profile>`): the integration's ID and secret key, the access token and the refresh token. The token
 goes only into the request's Authorization header, never into an address, an answer, a run record or the send journal.
 `amo` reaches only the account you signed in to, a host under `amocrm.ru`, `amocrm.com` or `kommo.com`, and never
 follows a redirect. amoCRM has no call that revokes a token: after a leak, revoke it on the integration's
 «Выданные доступы» tab (Kommo: Authorization), as [install and connect](installation.md#sign-out-and-revoke-access)
 shows.
+
+## Clients' phones and e-mails
+
+A contact or company on your own deals comes with its phones and e-mails. A user who is not an administrator sees
+those of at most 100 other contacts and companies a day, for the user and their agents together. The count is kept on
+this computer: it stops an accident or an agent, not someone who means to take the base.
+
+A call copied with the activities setting keeps only its direction, never the phone number or the recording. The
+morning digest masks phone numbers and e-mail addresses, and never prints a note's text.
+
+## api call
+
+`api call` reaches any operation of the amoCRM API v4, so it carries more checks than a command. It checks the
+operation's own permission key and the key of the command that does the same thing. A read of contacts, companies,
+notes, events or unsorted is refused to anyone but an administrator, since those hold clients' phones and e-mails. A
+link with an access token in an answer is removed before you see it. `api call` is never offered over MCP.
 
 ## MCP in the browser
 
