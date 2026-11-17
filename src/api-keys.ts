@@ -100,16 +100,16 @@ export const commandKeysOf = (operation: Operation, body?: unknown): string[] =>
   const owned = NOUNS[noun ?? ""]
   if (owned && operation.method === "POST" && rest.length === 2 && /^(link|unlink)$/.test(rest[1] ?? ""))
     return [`${owned}.update`]
+  // A deal created already won or lost is a close, so a create cannot get round `deals.close: deny` either.
+  const closes = owned === "deals" && recordsOf(body).some((one) => CLOSED.has(String(one.status_id)))
   if (owned && rest[0] === "complex" && operation.method === "POST")
-    return ["deals.create", "people.create", "organizations.create"]
+    return ["deals.create", "people.create", "organizations.create", ...(closes ? ["deals.close"] : [])]
   if (owned && (rest.length === 0 || record)) {
     if (operation.method === "GET") return [`${owned}.${record ? "show" : "list"}`]
-    if (operation.method === "POST") return [`${owned}.create`]
+    if (operation.method === "POST") return [`${owned}.create`, ...(closes ? ["deals.close"] : [])]
     if (operation.method !== "PATCH") return []
-    const records = recordsOf(body)
     const moves =
-      owned === "deals" && records.some((one) => one.status_id !== undefined || one.pipeline_id !== undefined)
-    const closes = owned === "deals" && records.some((one) => CLOSED.has(String(one.status_id)))
+      owned === "deals" && recordsOf(body).some((one) => one.status_id !== undefined || one.pipeline_id !== undefined)
     return [`${owned}.update`, ...(moves ? ["deals.move"] : []), ...(closes ? ["deals.close"] : [])]
   }
   if (operation.method !== "GET") return []

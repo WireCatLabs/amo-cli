@@ -94,6 +94,13 @@ describe("command keys a raw call does the same as", () => {
     ["PATCH /api/v4/leads", [{ id: 1, status_id: 143 }], ["deals.update", "deals.move", "deals.close"]],
     ["PATCH /api/v4/leads/1", { status_id: 50011 }, ["deals.update", "deals.move"]],
     ["PATCH /api/v4/leads/1", { pipeline_id: 5002 }, ["deals.update", "deals.move"]],
+    ["POST /api/v4/leads", [{ name: "x", status_id: 142 }], ["deals.create", "deals.close"]],
+    ["POST /api/v4/leads", [{ name: "x", status_id: 50011 }], ["deals.create"]],
+    [
+      "POST /api/v4/leads/complex",
+      [{ name: "x", status_id: 143 }],
+      ["deals.create", "people.create", "organizations.create", "deals.close"],
+    ],
     ["POST /api/v4/leads/1/link", [{ to_entity_id: 2, to_entity_type: "contacts" }], ["deals.update"]],
     ["POST /api/v4/contacts/1/unlink", [{ to_entity_id: 2, to_entity_type: "leads" }], ["people.update"]],
     ["GET /api/v4/contacts/1", undefined, ["people.show"]],
