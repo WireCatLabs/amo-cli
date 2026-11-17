@@ -74,16 +74,26 @@ const metadataOf = (custom: Record<string, unknown>, fields: readonly CrmField[]
 
 const embedded = (raw: Raw, key: string) => rawsOf(fieldOf(raw._embedded, key))
 
-const day = (at: unknown) => {
+/** The day a time falls on in the account's time zone (account-info `datetime_settings`), else in UTC. */
+const day = (at: unknown, timeZone: string | null) => {
   const ms = epoch(at)
-  return ms === null ? null : new Date(ms).toISOString().slice(0, 10)
+  if (ms === null) return null
+  try {
+    if (timeZone) return new Intl.DateTimeFormat("en-CA", { timeZone }).format(ms)
+  } catch {}
+  return new Date(ms).toISOString().slice(0, 10)
 }
 
 /**
  * A lead (leads-api): its stage is `status_id` in `pipeline_id`; amoCRM keeps no currency on a lead, so the amount is
- * in the account's `currency` (account-info). `closed_at` is a time, kept as its UTC day.
+ * in the account's `currency` (account-info). `closed_at` is a time, kept as its day in the account's time zone.
  */
-export const toDeal = (raw: Raw, fields: readonly CrmField[], currency: string | null): CrmItem => {
+export const toDeal = (
+  raw: Raw,
+  fields: readonly CrmField[],
+  currency: string | null,
+  timeZone: string | null = null,
+): CrmItem => {
   const { custom } = valuesOf(raw)
   const contacts = fieldOf(raw._embedded, "contacts")
   const stage = id(raw.status_id) ?? ""
@@ -93,7 +103,7 @@ export const toDeal = (raw: Raw, fields: readonly CrmField[], currency: string |
     pipeline: id(raw.pipeline_id) ?? "",
     stage,
     ...amountOf(raw.price, currency),
-    closedDate: stage === WON || stage === LOST ? day(raw.closed_at) : null,
+    closedDate: stage === WON || stage === LOST ? day(raw.closed_at, timeZone) : null,
     closedReason: stage === LOST ? text(embedded(raw, "loss_reason")[0]?.name) : null,
     organization: id(embedded(raw, "companies")[0]?.id),
     // `with=contacts` lists them with `is_main`; without it amoCRM did not say, and the stored ones stay.

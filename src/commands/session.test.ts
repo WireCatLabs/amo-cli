@@ -125,6 +125,25 @@ describe("session start", () => {
   })
 })
 
+describe("a keyring that does not answer", () => {
+  it("reads a token kept in the file, and a command reaches the account with it", async () => {
+    const dead = () => {
+      throw new Error("Platform failure: DBus error")
+    }
+    const keyring = { get: dead, set: dead, delete: dead }
+    const env = { AMO_CONFIG_DIR: mkdtempSync(join(tmpdir(), "amo-nokeyring-")) }
+    const started = await amo(
+      ["lost", "session", "start", "--host", FAKE_ORIGIN, "--credential-storage", "file", "--json"],
+      { keyring, env, stdin: FAKE_TOKEN },
+    )
+    expect(started.json().item).toMatchObject({ stored_in: "file" })
+    const status = await amo(["lost", "session", "status", "--check", "--json"], { keyring, env })
+    expect(status.json().item).toMatchObject({ state: "saved", kind: "token", token_from: "file", verified: true })
+    const read = await amo(["lost", "users", "list", "--json"], { keyring, env })
+    expect(read.code).toBe(0)
+  })
+})
+
 describe("session status, end and list", () => {
   it("shows where the token comes from and, with --check, whose it is", async () => {
     const plain = await amo(["work", "session", "status", "--json"])

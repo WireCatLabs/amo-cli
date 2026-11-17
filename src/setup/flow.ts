@@ -1,5 +1,12 @@
 import { CliError } from "@wirecat/cli-base"
-import { defineSetup, type SetupCheck } from "@wirecat/cli-core/cli"
+import {
+  commandWords,
+  defineSetup,
+  refuseCommandName,
+  refuseOffline,
+  rootOf,
+  type SetupCheck,
+} from "@wirecat/cli-core/cli"
 import { accountOrigin } from "../amo/account.js"
 import { appStorage } from "../amo/oauth.js"
 import { checkedToken } from "../commands/session.js"
@@ -16,12 +23,17 @@ import ru from "./texts.ru.json" with { type: "json" }
  * token. Editing a profile without a new token keeps the old one only for the same account.
  */
 const check: SetupCheck = async ({ command, settings, secrets }) => {
+  // The guards `session start` runs before it signs in.
+  refuseCommandName(contextOf(command).profile, commandWords(rootOf(command)), IDENTITY.command)
+  refuseOffline(command, "the amoCRM account")
   const origin = accountOrigin(String(settings.configured.host ?? ""))
   const typed = secrets.token?.trim()
   if (typed) {
     const { who, signIn, account } = await checkedToken(command, origin, typed)
-    const { env, profile, keyring } = contextOf(command)
-    // A request prefers an integration's sign-in to the token, so it would hide the token just proven.
+    const { env, profile, keyring, tokens } = contextOf(command)
+    // A request prefers an integration's sign-in to the token, so it would hide the token just proven. The token is
+    // saved first, as `session start` does: a save that fails leaves the integration's sign-in in place.
+    tokens.write(profile, signIn)
     appStorage(env, profile, keyring).remove()
     return { ...who, keep: { secrets: { token: signIn }, account } }
   }

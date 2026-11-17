@@ -1,9 +1,10 @@
 import { isCliError } from "@wirecat/cli-base"
+import { crmValues } from "@wirecat/cli-core/crm"
 import { isRecord } from "./amo/json.js"
 import { ROUTES } from "./amo/routes.js"
 import type { AmoTransport } from "./amo/transport.js"
 
-const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null)
+const { text } = crmValues
 
 export interface AccountUser {
   /** The host, as every session answer names it: cli-core's word for the place a sign-in belongs to. */

@@ -51,6 +51,8 @@ const mcpCommand = () =>
       "custom field values, notes and tags",
       "phone numbers, e-mail addresses and links",
       "whatever api call returns",
+      "the messages, notes and events search all finds",
+      "task texts and the notes activities list shows",
     ],
     permissionExample: "deals.close=deny",
     skill: SKILL,

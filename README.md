@@ -203,7 +203,8 @@ More: [settings and permissions](docs/configuration.md#permissions)
 
 ## Limits
 
-- `amo` is tested against a fake account built from the Kommo API reference, not yet against a live account.
+- `amo` is tested against a fake account built from the Kommo API reference, and each release passes a check on a
+  live test account: it syncs, reads, and creates, moves and closes a deal.
 - amoCRM has no call that deletes a deal, so there is no `deals delete`.
 - Without amoCRM's paid API filter add-on, `sync` reads a contact or company one request at a time, and a contact
   list cannot be narrowed by owner or time. A search by words still works.

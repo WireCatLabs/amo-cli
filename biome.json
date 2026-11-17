@@ -41,6 +41,60 @@
       }
     },
     {
+      "includes": ["src/commands/**", "!**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@modelcontextprotocol/**"],
+                    "message": "cli-core's appMcpCommand serves MCP; commands and services do not know the protocol"
+                  },
+                  {
+                    "group": ["../amo/transport.js", "**/amo/transport.js"],
+                    "importNamePattern": "(AmoTransport|AmoAnswer|QueryValue)",
+                    "invertImportNamePattern": true,
+                    "message": "commands reach amoCRM through src/crm/ and context.ts; only the transport's types pass through them (WC-ARCH-1)"
+                  },
+                  {
+                    "group": ["../amo/errors.js", "**/amo/errors.js"],
+                    "message": "the transport turns amoCRM's errors into CliErrors; commands see only those (WC-ARCH-1)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/crm/**", "src/amo/**", "!**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@modelcontextprotocol/**"],
+                    "message": "cli-core's appMcpCommand serves MCP; commands and services do not know the protocol"
+                  },
+                  {
+                    "group": ["commander", "**/commands/**", "../commands/*", "**/program.js", "../program.js"],
+                    "message": "the adapter and the CRM services sit below the commands; they never import a command, the program or commander (WC-ARCH-1)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/amo/operations.ts", "src/testing/kommo-schemas.ts"],
       "linter": {
         "rules": {

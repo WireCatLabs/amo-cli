@@ -206,6 +206,25 @@ describe("people, organizations and users read live", () => {
     expect(refused.json()).toMatchObject({ error: { reason: "amo.filters-off" } })
   })
 
+  it("filters by the sign-in's own user as assigned_to:me, and refuses a contact's created_at before asking amoCRM", async () => {
+    const fake = account()
+    for (const noun of ["people", "organizations"]) {
+      const mine = await amo(["work", noun, "list", "assigned_to:me", "--json"], { account: fake })
+      expect([mine.code, mine.err.slice(0, 300)]).toEqual([0, ""])
+      const read = fake.calls.filter((one) => one.path.endsWith(noun === "people" ? "/contacts" : "/companies"))
+      expect(read.at(-1)?.query["filter[responsible_user_id][]"]).toEqual(["7001"])
+    }
+    // Kommo's reference gives companies a created_at filter and contacts none.
+    expect((await amo(["work", "organizations", "list", "created_at>=7d", "--json"], { account: fake })).code).toBe(0)
+    const before = fake.calls.length
+    const recent = await amo(["work", "people", "list", "created_at>=7d", "--json"], { account: fake })
+    expect(recent.json()).toMatchObject({ error: { reason: "crm.record-field" } })
+    expect(fake.calls.slice(before).some((one) => one.path === "/api/v4/contacts")).toBe(false)
+    const wrong = await amo(["work", "people", "list", "assigned_to:anna", "--json"], { account: fake })
+    expect(wrong.json()).toMatchObject({ error: { reason: "crm.owner-unknown" } })
+    expect(fake.calls.some((one) => JSON.stringify(one.query).includes("NaN"))).toBe(false)
+  })
+
   it("shows a non-administrator a foreign contact without its phones and spends one of the day's views", async () => {
     const fake = account({ admin: false })
     const list = await listed(fake, ["people", "list"])
@@ -214,6 +233,17 @@ describe("people, organizations and users read live", () => {
     expect(list.items.find((one) => one.id === "401")?.phones).toBeDefined()
     const shown = (await amo(["work", "people", "show", "403", "--json"], { account: fake })).json()
     expect(shown).toMatchObject({ item: { id: "403", phones: [{ value: "+7 900 000-00-02" }] } })
+  })
+
+  it("answers a non-administrator's own reads under scope all, which only a sync refuses", async () => {
+    const fake = account({ admin: false })
+    const set = await amo(["work", "config", "set", `crm.amocrm:${FAKE_HOST}.scope`, "all", "--json"], {
+      account: fake,
+    })
+    expect(set.code).toBe(0)
+    expect((await amo(["work", "people", "show", "401", "--json"], { account: fake })).code).toBe(0)
+    const synced = await amo(["work", "sync", "--json"], { account: fake })
+    expect(synced.out + synced.err).toContain("amo.scope-all-refused")
   })
 
   it("lists the users for an administrator, and refuses anyone else as amoCRM does", async () => {

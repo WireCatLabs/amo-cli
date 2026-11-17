@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { type KeyringStore, memoryKeyring } from "@wirecat/cli-base"
@@ -81,6 +81,39 @@ describe("the setup flow", () => {
     })
     const shown = await amo(["work", "setup", "show", "--json"], { keyring: saved.keyring, env: saved.env })
     expect(shown.json()).toMatchObject({ item: { values: { host: FAKE_ORIGIN, token: { set: true } } } })
+  })
+
+  it("**refuses offline and a profile named as a command, as session start does**", async () => {
+    const offline = await amo(["work", "setup", "run", "apply", "--offline", "--json", "--answer-stdin"], {
+      keyring: memoryKeyring(),
+      env: { AMO_CONFIG_DIR: configs() },
+      stdin: `${JSON.stringify({ host: FAKE_ORIGIN, token: FAKE_TOKEN })}\n`,
+    })
+    expect(offline.code).not.toBe(0)
+    expect(offline.err).toContain("offline")
+    const named = await amo(["sync", "setup", "run", "apply", "--json", "--answer-stdin"], {
+      keyring: memoryKeyring(),
+      env: { AMO_CONFIG_DIR: configs() },
+      stdin: `${JSON.stringify({ host: FAKE_ORIGIN, token: FAKE_TOKEN })}\n`,
+    })
+    expect(named.code).not.toBe(0)
+  })
+
+  it("**a token that cannot be saved leaves the integration's sign-in in place**", async () => {
+    const inner = memoryKeyring({ "amo-cli:oauth:amocrm:work": "integration-entry" })
+    const keyring: KeyringStore = {
+      get: (service, account) => inner.get(service, account),
+      set: (service, account, value) => {
+        if (account === "token:work") throw new Error("keyring locked")
+        inner.set(service, account, value)
+      },
+      delete: (service, account) => inner.delete(service, account),
+    }
+    const env = { AMO_CONFIG_DIR: configs() }
+    writeFileSync(join(env.AMO_CONFIG_DIR, "credentials.json"), "not json")
+    const failed = await apply({ host: FAKE_ORIGIN, token: FAKE_TOKEN }, keyring, env)
+    expect(failed.code).not.toBe(0)
+    expect(inner.get("amo-cli", "oauth:amocrm:work")).toBe("integration-entry")
   })
 
   it("**apply --dry-run stops at a bad address and saves nothing; apply saves as run apply does**", async () => {

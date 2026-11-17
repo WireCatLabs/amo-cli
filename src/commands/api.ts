@@ -17,17 +17,18 @@ import {
   terminalAsker,
   withQuery,
 } from "@wirecat/cli-core/cli"
-import { CRM_ASSIGN_OTHERS_KEY, refuseForeignClientReads } from "@wirecat/cli-core/crm"
+import { CRM_ASSIGN_OTHERS_KEY, refuseForeignClientReads, withoutFileLinks } from "@wirecat/cli-core/crm"
 import { levelFor } from "@wirecat/cli-core/sends"
 import { Command } from "commander"
 import * as v from "valibot"
-import { type Matched, matchOperation, OPERATIONS, type Operation, pathOf } from "../amo/operation.js"
+import { type Matched, matchOperation, OPERATIONS, type Operation, pathOf, withEveryId } from "../amo/operation.js"
 import type { AmoAnswer, QueryValue } from "../amo/transport.js"
 import { apiDefault, apiKey, assignsOthers, commandKeysOf, employeeRuleOf, readsClients } from "../api-keys.js"
 import { permissions } from "../config.js"
 import { contextOf, storedSignIn, withAccount } from "../context.js"
 import { amoCrmSource } from "../crm/source.js"
 import { IDENTITY } from "../identity.js"
+import { accountUser } from "../whoami.js"
 import { write } from "./write.js"
 
 const AMO = IDENTITY.command
@@ -145,14 +146,32 @@ const pathWords = (command: Command) => {
   return path
 }
 
+/**
+ * The sign-in's user, for a write that names one: `AMO_TOKEN` carries none, so the account is asked whose token it is,
+ * as the CRM commands do. `--dry-run` asks nobody and checks `crm.assign-others` for any user named.
+ */
+const selfOf = async (command: Command, { operation }: Matched, body: unknown) => {
+  if (!assignsOthers(operation, body, () => undefined)) return undefined
+  const saved = storedSignIn(command)?.userId
+  if (saved) return saved
+  const { tokens, profile } = contextOf(command)
+  if (tokens.read(profile)?.source !== "environment") return undefined
+  return (await withAccount(command, accountUser)).user.id || undefined
+}
+
 /** Every key the call checks, the command keys it does the same as, and `crm.assign-others` when it hands records on. */
-const keysOf = (command: Command, matched: Matched, body: unknown) => {
+const keysOf = (
+  command: Command,
+  matched: Matched,
+  body: unknown,
+  self: () => string | undefined = () => storedSignIn(command)?.userId,
+) => {
   const { operation } = matched
   return {
     key: apiKey(operation),
     extra: [
       ...commandKeysOf(operation, body),
-      ...(assignsOthers(operation, body, () => storedSignIn(command)?.userId) ? [CRM_ASSIGN_OTHERS_KEY] : []),
+      ...(assignsOthers(operation, body, self) ? [CRM_ASSIGN_OTHERS_KEY] : []),
     ],
   }
 }
@@ -222,7 +241,7 @@ const callCommand = () =>
     .option("--body <json>", "the request body as JSON, an array of records for most writes")
     .option("--dry-run", "show every permission this call checks, with its level, and call nothing")
     .action(async function (this: Command, raw: string, options: { params?: string; body?: string; dryRun?: boolean }) {
-      const matched = matchOperation(raw)
+      const matched = withEveryId(matchOperation(raw))
       const { operation } = matched
       const query = queryOf(options.params)
       const body = bodyOf(operation, options.body)
@@ -232,10 +251,12 @@ const callCommand = () =>
         method: operation.name,
         path: pathOf(matched),
         status: answer.status,
-        result: answer.body ?? null,
+        // A download link opens the file without a sign-in, so it never leaves amo (as b24, cli-core's files).
+        result: withoutFileLinks(answer.body ?? null),
         untrusted: UNTRUSTED,
       })
-      const { key, extra } = keysOf(this, matched, body)
+      const self = await selfOf(this, matched, body)
+      const { key, extra } = keysOf(this, matched, body, () => self)
       if (operation.effect !== "read")
         return write(this, { key, extra, act: async (account) => shown(await account.request(send)) })
       const { settings } = contextOf(this)

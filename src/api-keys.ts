@@ -100,22 +100,28 @@ export const commandKeysOf = (operation: Operation, body?: unknown): string[] =>
   const owned = NOUNS[noun ?? ""]
   if (owned && operation.method === "POST" && rest.length === 2 && /^(link|unlink)$/.test(rest[1] ?? ""))
     return [`${owned}.update`]
+  // A deal created already won or lost is a close, so a create cannot get round `deals.close: deny` either.
+  const closes = owned === "deals" && recordsOf(body).some((one) => CLOSED.has(String(one.status_id)))
+  // Unsorted leads become deals: an accept or a form or call makes one, a link joins one to a deal already there.
+  if (noun === "leads" && rest[0] === "unsorted" && operation.method === "POST") {
+    if (rest.at(-1) === "link") return ["deals.update"]
+    return ["deals.create", ...(closes ? ["deals.close"] : [])]
+  }
   if (owned && rest[0] === "complex" && operation.method === "POST")
-    return ["deals.create", "people.create", "organizations.create"]
+    return ["deals.create", "people.create", "organizations.create", ...(closes ? ["deals.close"] : [])]
   if (owned && (rest.length === 0 || record)) {
     if (operation.method === "GET") return [`${owned}.${record ? "show" : "list"}`]
-    if (operation.method === "POST") return [`${owned}.create`]
+    if (operation.method === "POST") return [`${owned}.create`, ...(closes ? ["deals.close"] : [])]
     if (operation.method !== "PATCH") return []
-    const records = recordsOf(body)
     const moves =
-      owned === "deals" && records.some((one) => one.status_id !== undefined || one.pipeline_id !== undefined)
-    const closes = owned === "deals" && records.some((one) => CLOSED.has(String(one.status_id)))
+      owned === "deals" && recordsOf(body).some((one) => one.status_id !== undefined || one.pipeline_id !== undefined)
     return [`${owned}.update`, ...(moves ? ["deals.move"] : []), ...(closes ? ["deals.close"] : [])]
   }
   if (operation.method !== "GET") return []
   if (noun === "leads" && rest[0] === "pipelines")
     return [rest.includes("statuses") ? "stages.list" : rest.length > 1 ? "pipelines.show" : "pipelines.list"]
   if (noun === "users" && (rest.length === 0 || record)) return [record ? "users.show" : "users.list"]
+  if (noun === "tasks" && (rest.length === 0 || record)) return ["activities.list"]
   if (owned && rest[0] === "custom_fields") return ["fields.list"]
   return []
 }
@@ -127,10 +133,12 @@ export const assignsOthers = (operation: Operation, body: unknown, self: () => s
   if (operation.effect === "read" || !ASSIGNED.has(operation.family)) return false
   const named = recordsOf(body)
     .flatMap((one) => [one, ...nestedOf(one)])
-    .filter((one) => one.responsible_user_id !== undefined)
+    // An unsorted lead's accept names the deal's user as `user_id` (Kommo "Accepting unsorted").
+    .map((one) => one.responsible_user_id ?? (operation.template.endsWith("/accept") ? one.user_id : undefined))
+    .filter((one) => one !== undefined)
   if (named.length === 0) return false
   const me = self()
-  return named.some((one) => String(one.responsible_user_id) !== me)
+  return named.some((one) => String(one) !== me)
 }
 
 /** What names or embeds contacts and companies in another record's answer. */
@@ -150,8 +158,9 @@ export const readsClients = (operation: Operation, query: Readonly<Record<string
   // A call note's `params.phone` is the client's number (Kommo add-notes), and a field-change event carries the new
   // value, a contact's phone or e-mail included (events-filtration): every note and event read is a client read.
   if (rest.includes("notes") || operation.family === "events") return true
-  const asked = query.with
-  const words = (Array.isArray(asked) ? asked : [asked]).flatMap((one) => String(one ?? "").split(","))
+  // The transport sends any query name, so `with[]` and `with[0]` count as `with`.
+  const asked = Object.entries(query).flatMap(([name, value]) => (/^with(\[\d*\])?$/.test(name) ? [value].flat() : []))
+  const words = asked.flatMap((one) => String(one ?? "").split(","))
   return words.some((one) => CLIENT_WITH.has(one.trim()))
 }
 
@@ -199,6 +208,7 @@ const COMMAND_KEYS = [
   "users.list",
   "users.show",
   "fields.list",
+  "activities.list",
 ]
 
 /** The keys `permissions` may name for `api` and the commands it maps onto. */

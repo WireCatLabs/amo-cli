@@ -2,6 +2,7 @@ import { crmSourceContract, crmWriteContract } from "@wirecat/cli-core/crm/testi
 import { describe, expect, it } from "vitest"
 import { AmoTransport } from "../amo/transport.js"
 import { FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, type FakeAmoOptions, fakeAmo } from "../testing/fake-amo.js"
+import { toDeal } from "./records.js"
 import { amoCrmSource } from "./source.js"
 import { amoCrmWriter } from "./writer.js"
 
@@ -298,7 +299,56 @@ describe("amoCrmSource", () => {
     expect(ids).toEqual(["302", "303", "304"])
     const reads = account.calls.filter((one) => one.path === "/api/v4/leads")
     expect(reads.every((one) => one.query["order[updated_at]"]?.[0] === "desc")).toBe(true)
-    expect(reads.length).toBeLessThan(5)
+    expect(new Set(reads.map((one) => one.query.page?.[0])).size).toBeLessThan(5)
+  })
+
+  it.each([
+    ["a first round, filters on", null, true],
+    ["a first round, filters off", null, false],
+    ["a later round, filters off", "later", false],
+  ])("never skips a deal when one read before it is deleted between pages: %s", async (_, round, apiFilter) => {
+    const { account, source } = over({ apiFilter }, 1)
+    const top = Math.floor(Date.now() / 1000)
+    if (round)
+      for (const [lead, ago] of [
+        [301, 60],
+        [302, 15 * 60],
+        [304, 20 * 60],
+      ] as const) {
+        const found = account.data.leads.find((one) => one.id === lead)
+        if (found) found.updated_at = top - ago
+      }
+    const cursor = round ? new Date((top - 30 * 60) * 1000).toISOString() : null
+    const ids = new Set<string>()
+    let page: string | undefined
+    for (;;) {
+      const answer = await source.changes("deal", cursor, page, mine)
+      if ("reset" in answer) throw new Error("reset")
+      for (const one of answer.items) ids.add(one.externalId)
+      if (ids.has("301") && account.data.leads.some((one) => one.id === 301)) account.remove("lead", 301, top)
+      if (!answer.hasMore) break
+      page = answer.nextCursor
+    }
+    expect(ids).toContain("302")
+  })
+
+  it.each([
+    ["person", "contact", 402],
+    ["organization", "company", 502],
+  ] as const)("names a deleted %s", async (kind, entity, deleted) => {
+    const { account, source } = over({}, 250)
+    const cursor = new Date(Date.now() - 60_000).toISOString()
+    account.remove(entity, deleted, Math.floor(Date.now() / 1000))
+    const removed: string[] = []
+    let page: string | undefined
+    for (;;) {
+      const answer = await source.changes(kind, cursor, page, mine)
+      if ("reset" in answer) throw new Error("reset")
+      removed.push(...(answer.removed ?? []))
+      if (!answer.hasMore) break
+      page = answer.nextCursor
+    }
+    expect(removed).toContain(String(deleted))
   })
 
   it("names a deleted record, and keeps one restored after its deletion", async () => {
@@ -704,5 +754,28 @@ describe("amoCrmSource", () => {
       "filter[updated_at][from]": ["1767312000"],
       "filter[updated_at][to]": ["1767312000"],
     })
+  })
+})
+
+describe("a deal's close date", () => {
+  it("is the day in the account's time zone, and the UTC day when amoCRM names none", () => {
+    const won = {
+      id: 1,
+      name: "x",
+      status_id: 142,
+      pipeline_id: 1,
+      price: 5,
+      closed_at: Date.UTC(2026, 10, 16, 22, 30) / 1000,
+    }
+    expect(toDeal(won, [], "RUB", "Europe/Moscow").closedDate).toBe("2026-11-17")
+    expect(toDeal(won, [], "RUB", null).closedDate).toBe("2026-11-16")
+    expect(toDeal(won, [], "RUB", "Not/AZone").closedDate).toBe("2026-11-16")
+  })
+
+  it("reads the account's time zone with the account", async () => {
+    const { account, source } = over()
+    await source.account()
+    const read = account.calls.find((one) => one.path === "/api/v4/account")
+    expect(read?.query.with?.[0]).toContain("datetime_settings")
   })
 })

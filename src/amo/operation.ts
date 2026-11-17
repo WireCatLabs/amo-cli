@@ -153,6 +153,19 @@ export const matchOperation = (raw: string): Matched => {
   return first
 }
 
+/** Refuses a template with a placeholder left empty: it would send another operation's path, never checked for. */
+export const withEveryId = (matched: Matched): Matched => {
+  const missing = Object.keys(matched.operation.path).filter((name) => !matched.ids[name])
+  if (missing.length === 0) return matched
+  const { method, template, name } = matched.operation
+  throw new CliError(
+    "validation_error",
+    `${name} needs ${missing.map((one) => `{${one}}`).join(", ")} in the path, such as ` +
+      `${method} ${template.replace(/\{\w+\}/g, "42")}`,
+    { reason: "api.path-id-missing", param: "<method>" },
+  )
+}
+
 /** The path to send: the template with each id put in its place. */
 export const pathOf = ({ operation, ids }: Matched): string =>
   operation.template.replace(/\{(\w+)\}/g, (_, name: string) => encodeURIComponent(ids[name] ?? ""))
