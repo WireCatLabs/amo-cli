@@ -2,7 +2,7 @@
 
 Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
-## Unreleased
+## 0.1.0 — 17.11.2026
 
 ### Added
 
@@ -44,3 +44,9 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 - `sync` resumes inside a page when a run's request budget ends, and reads clients only by the ids its deals name.
   A colleague's client on none of your deals never enters the copy, and a record restored from amoCRM's trash comes
   back whatever order amoCRM lists the events in.
+
+### Fixed
+
+- A sign-in from `AMO_TOKEN` and `AMO_HOST` now finds its user: each command asks the account whose token it is, as
+  `session start` does, so `deals list` and the other reads of the copy show that user's deals instead of none. The
+  token is kept nowhere. Under `--offline` nobody is asked, and the reads show none.
