@@ -1,0 +1,2 @@
+# version commit date script tree — one line per passed live check
+0.0.0 fb5e08895f6b5215c77511f29b9080888537e76d 2026-11-17 bin/amo-live v2:3a2b7d0ef004497001db523f40a1bdf84cd7003c03d1dd851dc218e5b6d5faa3
