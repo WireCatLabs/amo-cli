@@ -6,9 +6,10 @@
 </p>
 
 <p align="center">
-  <a href="https://wirecat.dev/en/docs/amo">Docs</a> ·
-  <a href="https://wirecat.dev/en/docs/amo/compare">Comparison</a> ·
-  <a href="https://discord.gg/DebENqbRrJ">Discord</a>
+  <a href="https://github.com/WireCatLabs/amo-cli/blob/main/docs/index.md">Docs</a> ·
+  <a href="https://github.com/WireCatLabs/amo-cli/blob/main/docs/installation.md">Install</a> ·
+  <a href="https://github.com/WireCatLabs/amo-cli/blob/main/docs/usage.md">Usage</a> ·
+  <a href="https://t.me/wirecatdev">Telegram</a>
 </p>
 
 <p align="center">
