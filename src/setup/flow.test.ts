@@ -83,6 +83,22 @@ describe("the setup flow", () => {
     expect(shown.json()).toMatchObject({ item: { values: { host: FAKE_ORIGIN, token: { set: true } } } })
   })
 
+  it("**refuses offline and a profile named as a command, as session start does**", async () => {
+    const offline = await amo(["work", "setup", "run", "apply", "--offline", "--json", "--answer-stdin"], {
+      keyring: memoryKeyring(),
+      env: { AMO_CONFIG_DIR: configs() },
+      stdin: `${JSON.stringify({ host: FAKE_ORIGIN, token: FAKE_TOKEN })}\n`,
+    })
+    expect(offline.code).not.toBe(0)
+    expect(offline.err).toContain("offline")
+    const named = await amo(["sync", "setup", "run", "apply", "--json", "--answer-stdin"], {
+      keyring: memoryKeyring(),
+      env: { AMO_CONFIG_DIR: configs() },
+      stdin: `${JSON.stringify({ host: FAKE_ORIGIN, token: FAKE_TOKEN })}\n`,
+    })
+    expect(named.code).not.toBe(0)
+  })
+
   it("**a token that cannot be saved leaves the integration's sign-in in place**", async () => {
     const inner = memoryKeyring({ "amo-cli:oauth:amocrm:work": "integration-entry" })
     const keyring: KeyringStore = {

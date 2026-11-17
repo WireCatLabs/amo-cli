@@ -1,5 +1,12 @@
 import { CliError } from "@wirecat/cli-base"
-import { defineSetup, type SetupCheck } from "@wirecat/cli-core/cli"
+import {
+  commandWords,
+  defineSetup,
+  refuseCommandName,
+  refuseOffline,
+  rootOf,
+  type SetupCheck,
+} from "@wirecat/cli-core/cli"
 import { accountOrigin } from "../amo/account.js"
 import { appStorage } from "../amo/oauth.js"
 import { checkedToken } from "../commands/session.js"
@@ -16,6 +23,9 @@ import ru from "./texts.ru.json" with { type: "json" }
  * token. Editing a profile without a new token keeps the old one only for the same account.
  */
 const check: SetupCheck = async ({ command, settings, secrets }) => {
+  // The guards `session start` runs before it signs in.
+  refuseCommandName(contextOf(command).profile, commandWords(rootOf(command)), IDENTITY.command)
+  refuseOffline(command, "the amoCRM account")
   const origin = accountOrigin(String(settings.configured.host ?? ""))
   const typed = secrets.token?.trim()
   if (typed) {
