@@ -17,7 +17,8 @@ variable or the default.
 2. [Permissions](#permissions)
 3. [Which deals sync copies](#which-deals-sync-copies)
 4. [Tasks and calls](#tasks-and-calls)
-5. [Run records](#run-records)
+5. [A task when a deal enters a stage](#a-task-when-a-deal-enters-a-stage)
+6. [Run records](#run-records)
 
 ## See and change a setting
 
@@ -78,6 +79,25 @@ read live with `people` or `organizations`.
 `crm.amocrm:<address>.activities` is off by default. Turned on, the next `sync` copies the tasks, comments and calls on
 your deals and their clients from the last 90 days. [Tasks and what changed](usage.md#tasks-and-what-changed) shows the
 command. Like the choice of deals, only you set it, at a terminal.
+
+## A task when a deal enters a stage
+
+`crm.amocrm:<address>.stage-tasks` names stages, and each deal that moves into one of them opens a task on this
+computer, beside your other WireCat tasks. The sync that brings the move opens it, once per move: a task you dismiss
+does not come back, and the next entry into the same stage opens a new one. A stage is named by its id, which
+`amo work stages list --json` prints as `external_id`. The command below uses the example address
+`example.amocrm.ru`. amoCRM's won stage is `142` in every pipeline, so this rule opens a task for a win in any of
+them:
+
+```sh
+amo work config set crm.amocrm:example.amocrm.ru.stage-tasks \
+  '{"142":{"title":"Send the closing papers","due_days":2}}'
+amo work sync
+```
+
+`amo` reads the account's stage history, so a deal that passed through a stage between two syncs still gets that
+stage's task. Moves made before the setting was first set open none. Only you set it, at a terminal. To stop,
+`amo work config unset crm.amocrm:example.amocrm.ru.stage-tasks`.
 
 ## Run records
 

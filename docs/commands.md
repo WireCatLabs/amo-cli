@@ -1233,8 +1233,12 @@ the instructions an agent is given for this tool
 print SKILL.md — `amo skill install` puts it where Claude Code, Codex, Gemini CLI and OpenClaw look for it, and where Hermes does on request; --for prints the copy already there
 
 ```sh
-amo skill show [options]
+amo skill show [name] [options]
 ```
+
+| Argument | | What it is |
+|---|---|---|
+| `name` | optional | a part of this skill, or a skill shipped for a task: writing, setup, reading, output, mcp. |
 
 | Option | What it does |
 |---|---|
