@@ -55,9 +55,8 @@ check` looks for its line in `docs/dev/live-checks.txt`. The owner runs `bin/amo
 
 Each run gets a throwaway folder for config, state and a store per profile, so the real store is never opened. The
 CLI cannot reach the keyring (`DBUS_SESSION_BUS_ADDRESS=disabled:`). The token goes in on stdin to
-`session start --credential-storage file`, inside that folder. `AMO_TOKEN` is not used: a sign-in from it names no
-user, so offline reads would show no deals. The script sets no owner-only setting, so it also runs inside an agent's
-terminal. The log is kept in `~/.cache/amo-live/<time>.log`. It holds refs, ids, stage names, statuses and counts,
+`session start --credential-storage file`, inside that folder, the way a person signs in. The script sets no
+owner-only setting, so it also runs inside an agent's terminal. The log is kept in `~/.cache/amo-live/<time>.log`. It holds refs, ids, stage names, statuses and counts,
 but never a client's name or the token.
 
 ## The bundle a user installs

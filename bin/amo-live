@@ -15,8 +15,8 @@
 # <account> is the keyring entry `secret-tool store --label="amo <account>" service amo account <account>` holds the
 # long-lived token in. The address is not in the keyring: give it with --host or AMO_HOST.
 #
-# The token reaches amo on stdin, to `session start --credential-storage file` in the throwaway folder, not as
-# AMO_TOKEN: a sign-in from AMO_TOKEN names no user, so offline reads would show none of the copied deals.
+# The token reaches amo on stdin, to `session start --credential-storage file` in the throwaway folder, the way a
+# person signs in, so the run checks that sign-in; never as an argument.
 # The run never sets an owner-only setting, so it passes inside an agent's terminal too.
 set -euo pipefail
 

@@ -1,3 +1,6 @@
+import { mkdtempSync, readdirSync, readFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { memoryKeyring } from "@wirecat/cli-base"
 import { describe, expect, it } from "vitest"
 import { openAmoStore } from "../store.js"
@@ -144,6 +147,37 @@ describe("a colleague's profile on the same account", () => {
     expect((await as("work", ["search", "all", "Test lead"])).items.length).toBeGreaterThan(0)
     const searched = await as("home", ["search", "all", "Test lead"])
     expect([searched.ran.code, searched.items]).toEqual([0, []])
+  })
+})
+
+describe("a sign-in from AMO_TOKEN", () => {
+  it("asks the account whose token it is, so a read of the copy shows that user's deals, and keeps nothing", async () => {
+    const touched: string[] = []
+    const keyring = {
+      get: (service: string, name: string) => {
+        touched.push(`get ${service} ${name}`)
+        return null
+      },
+      set: (service: string, name: string) => void touched.push(`set ${service} ${name}`),
+      delete: (service: string, name: string) => {
+        touched.push(`delete ${service} ${name}`)
+        return false
+      },
+    }
+    const config = mkdtempSync(join(tmpdir(), "config-"))
+    const env = { AMO_TOKEN: FAKE_TOKEN, AMO_HOST: FAKE_HOST, AMO_CONFIG_DIR: config }
+    const fake = account()
+    expect((await amo(["work", "sync", "--json"], { account: fake, keyring, env })).code).toBe(0)
+    const before = reads(fake, "/api/v4/account").length
+    const ran = await amo(["work", "deals", "list", "--json"], { account: fake, keyring, env })
+    expect([ran.code, ran.err]).toEqual([0, ""])
+    const items = ran.json().items as { assignee: string }[]
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.every((one) => one.assignee === `${FAKE_HOST}/user/7001`)).toBe(true)
+    expect(reads(fake, "/api/v4/account").length - before).toBe(1)
+    expect(touched).toEqual([])
+    expect(readdirSync(config).filter((name) => name.includes("credential"))).toEqual([])
+    for (const name of readdirSync(config)) expect(readFileSync(join(config, name), "utf8")).not.toContain(FAKE_TOKEN)
   })
 })
 
