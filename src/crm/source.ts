@@ -42,6 +42,8 @@ interface Account {
   filters: boolean
   /** A lead has no currency of its own; the account's is every amount's (account-info). */
   currency: string | null
+  /** The account's IANA time zone (account-info `datetime_settings`), which dates a deal's close. */
+  timeZone: string | null
 }
 
 /** One list page: its rows in `_embedded.<name>`, and whether `_links.next` says more come (leads-api). 204 is empty. */
@@ -120,7 +122,11 @@ const linkedIds = (raw: Raw, key: string) => rawsOf(fieldOf(raw._embedded, key))
 const WITH: Record<AmoKind, string> = { deal: "contacts,loss_reason", person: "leads", organization: "leads,contacts" }
 
 /** A live list's conditions as amoCRM's `filter[…]` (filters-api); one the operation does not declare is refused. */
-const filtersOf = (kind: CrmLiveKind, conditions: readonly CrmCondition[]): Record<string, QueryValue> => {
+const filtersOf = (
+  kind: CrmLiveKind,
+  conditions: readonly CrmCondition[],
+  self?: string,
+): Record<string, QueryValue> => {
   const declared = new Set(matchOperation(ENTITIES[kind].list).operation.query)
   const query: Record<string, QueryValue> = {}
   const set = (name: string, value: QueryValue) => {
@@ -132,7 +138,13 @@ const filtersOf = (kind: CrmLiveKind, conditions: readonly CrmCondition[]): Reco
   }
   for (const { field, op, value } of conditions) {
     if (field === "assigned_to" && (op === "=" || op === "in")) {
-      set("filter[responsible_user_id][]", (Array.isArray(value) ? value : [value]).map(Number))
+      const users = (Array.isArray(value) ? value : [value]).map((one) => (one === "me" ? self : String(one)))
+      for (const user of users)
+        if (!user || !/^[1-9][0-9]*$/.test(user))
+          throw new CliError("validation_error", "assigned_to takes me or an amoCRM user id, such as 7", {
+            reason: "crm.owner-unknown",
+          })
+      set("filter[responsible_user_id][]", users.map(Number))
       continue
     }
     if ((field === "created_at" || field === "updated_at") && typeof value === "number" && op !== "!=" && op !== "in") {
@@ -201,11 +213,14 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
   }
   let about: Promise<Account> | undefined
   const accountOf = (caller: Caller = account()) =>
-    (about ??= caller.request({ route: ROUTES.account, query: { with: "is_api_filter_enabled" } }).then(({ body }) => ({
-      userId: id(fieldOf(body, "current_user_id")) ?? "",
-      filters: fieldOf(body, "is_api_filter_enabled") === true,
-      currency: text(fieldOf(body, "currency")),
-    })))
+    (about ??= caller
+      .request({ route: ROUTES.account, query: { with: "is_api_filter_enabled,datetime_settings" } })
+      .then(({ body }) => ({
+        userId: id(fieldOf(body, "current_user_id")) ?? "",
+        filters: fieldOf(body, "is_api_filter_enabled") === true,
+        currency: text(fieldOf(body, "currency")),
+        timeZone: text(fieldOf(fieldOf(fieldOf(body, "_embedded"), "datetime_settings"), "timezone")),
+      })))
   const loaded = new Map<CrmKind, Promise<CrmField[]>>()
   const fields = (kind: CrmKind, caller: Caller = account()) => {
     let found = loaded.get(kind)
@@ -221,9 +236,9 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
   }
   const mapped = async <K extends CrmKind>(kind: K, rows: Raw[], caller: Caller): Promise<CrmRecords[K][]> => {
     const defined = await fields(kind, caller)
-    const { currency } = await accountOf(caller)
+    const { currency, timeZone } = await accountOf(caller)
     const map = { deal: toDeal, lead: toDeal, person: toPerson, organization: toOrganization }[kind]
-    return rows.map((raw) => map(raw, defined, currency)) as CrmRecords[K][]
+    return rows.map((raw) => map(raw, defined, currency, timeZone)) as CrmRecords[K][]
   }
 
   /** Each lead's responsible user, as far as a round has seen; one not seen yet is read by id. */
@@ -300,6 +315,19 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
   }
 
   /**
+   * Page `at` and the page before it, read again after it: a row gone from an earlier page between two page reads
+   * moves every later row up one place, and the one that moved onto the page before would be skipped. A row already
+   * answered in this process is left out by the caller; one answered by an earlier run is saved again, harmlessly.
+   */
+  const overlapped = async (read: (at: number) => Promise<{ rows: Raw[]; more: boolean }>, at: number) => {
+    const page = await read(at)
+    if (at === 1) return page
+    const on = new Set(page.rows.map((raw) => id(raw.id)))
+    const before = (await read(at - 1)).rows.filter((raw) => !on.has(id(raw.id)))
+    return { rows: [...before, ...page.rows], more: page.more }
+  }
+
+  /**
    * One page of the leads a round reads: in a full `mine` round only the chosen users' (narrowed by the add-on, else
    * kept from every lead), after a cursor every changed one, as core drops a lead given away by its assignee. The
    * clients' rounds of a full round walk the same pages before the deals', so it lists each lead page once (research §4
@@ -314,7 +342,7 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       const { filters } = await accountOf(caller)
       const narrow: Record<string, QueryValue> =
         from === null && chosen && filters ? { "filter[responsible_user_id][]": chosen.map(Number) } : {}
-      const { rows, more } = await round(caller, "deal", at, from, narrow)
+      const { rows, more } = await overlapped((one) => round(caller, "deal", one, from, narrow), at)
       remember(rows)
       return { rows: from === null && chosen ? rows.filter((raw) => chosen.includes(ownerOf(raw))) : rows, more }
     })()
@@ -325,7 +353,7 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
 
   /** The clients of a round already read in this process, so one on many leads is read once. */
   const seen = new Map<string, Set<string>>()
-  const seenOf = (kind: CrmKind, started: number) => {
+  const seenOf = (kind: string, started: number) => {
     const key = `${kind}@${started}`
     const found = seen.get(key) ?? new Set<string>()
     seen.set(key, found)
@@ -395,6 +423,14 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       const rows: Raw[] = []
       const removed = new Set<string>()
       const kept = seenOf(kind, started)
+      const answered = seenOf(`${kind} answered`, started)
+      const fresh = (found: readonly Raw[]) =>
+        found.filter((raw) => {
+          const one = id(raw.id) ?? ""
+          if (answered.has(one)) return false
+          answered.add(one)
+          return true
+        })
       // A fixed window keeps an events page's offsets put across runs (events-list's filter[created_at][to]).
       const window = { "filter[created_at][from]": from ?? 0, "filter[created_at][to]": seconds(started) }
       const answer = async (done: boolean): Promise<CrmChanges<CrmRecords[K]>> => ({
@@ -432,20 +468,19 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
       }
       /** The sub-offset of the row `externalId`: kept only while the spot is still on that row. */
       const subOf = (externalId: string) => (spot.k === externalId && spot.l !== undefined ? spot.l : 0)
-      const clientsEnd = client === "person" ? "" : "r"
       try {
         for (;;) {
           if (spot.ph === "") return await answer(true)
           if (spot.ph === "d") {
             const { rows: leads, more } = await leadPage(caller, spot.p, from, chosen)
-            for (const raw of leads) rows.push(raw)
+            for (const raw of fresh(leads)) rows.push(raw)
             if (after(more, from === null ? "" : "r")) return await answer(false)
             continue
           }
           if (spot.ph === "a" && client) {
-            const { rows: found, more } = await round(caller, client, spot.p, from)
-            for (const raw of found) rows.push(raw)
-            if (after(more && found.length > 0, from === null ? "" : clientsEnd)) return await answer(false)
+            const { rows: found, more } = await overlapped((one) => round(caller, client, one, from), spot.p)
+            for (const raw of fresh(found)) rows.push(raw)
+            if (after(more && found.length > 0, from === null ? "" : "r")) return await answer(false)
             continue
           }
           if ((spot.ph === "w" || spot.ph === "n") && client && chosen) {
@@ -473,7 +508,7 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
               spot = { ph: spot.ph, p: spot.p, o: spot.o + 1, k: leadId }
               progressed = true
             }
-            if (after(more, spot.ph === "w" ? "" : clientsEnd)) return await answer(false)
+            if (after(more, spot.ph === "w" ? "" : "r")) return await answer(false)
             continue
           }
           if (spot.ph === "c" && client && chosen && from !== null) {
@@ -641,7 +676,8 @@ export const amoCrmSource = (account: () => AmoTransport, options: AmoSourceOpti
     },
     async list<K extends CrmLiveKind>(kind: K, query: CrmLiveQuery, context?: CrmCallContext) {
       const caller = metered(context)
-      const filters = filtersOf(kind, query.conditions)
+      const me = query.conditions.some((one) => one.field === "assigned_to" && [one.value].flat().includes("me"))
+      const filters = filtersOf(kind, query.conditions, me ? (await accountOf(caller)).userId : undefined)
       if (Object.keys(filters).length && !(await accountOf(caller)).filters)
         throw new CliError(
           "validation_error",

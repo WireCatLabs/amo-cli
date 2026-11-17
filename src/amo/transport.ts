@@ -8,7 +8,7 @@ import type { AmoSignIn } from "./account.js"
 import { amoError, isBlock } from "./errors.js"
 import { isRecord } from "./json.js"
 import type { AppAuth } from "./oauth.js"
-import { type Matched, matchOperation, pathOf } from "./operation.js"
+import { type Matched, matchOperation, pathOf, withEveryId } from "./operation.js"
 import { ROUTES, type Route } from "./routes.js"
 
 /** A third of a one-shot command's 30 s deadline, so a read that timed out can be tried again before the run ends. */
@@ -67,7 +67,9 @@ const routeOf = (request: AmoRequest): Matched => {
   for (const [key, value] of Object.entries(ids))
     if (!(key in matched.operation.path) || value === "" || value === "." || value === "..")
       throw new CliError("validation_error", `${matched.operation.name} takes no id ${key}="${value}"`)
-  return { operation: matched.operation, ids: { ...matched.ids, ...ids } }
+  const all = { ...matched.ids, ...ids }
+  withEveryId({ operation: matched.operation, ids: all })
+  return { operation: matched.operation, ids: all }
 }
 
 const EMPLOYEE_REFUSALS: Record<EmployeeRule, string> = {

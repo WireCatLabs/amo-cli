@@ -1,7 +1,8 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { memoryKeyring } from "@wirecat/cli-base"
 import { afterEach, describe, expect, it } from "vitest"
-import { fakeAmo } from "../testing/fake-amo.js"
+import { FAKE_COLLEAGUE_ID, FAKE_HOST, FAKE_TOKEN, FAKE_USER_ID, fakeAmo } from "../testing/fake-amo.js"
 import { amo, signedIn } from "../testing/harness.js"
 
 const config = join(process.env.AMO_CONFIG_DIR ?? "", "config.json")
@@ -60,6 +61,17 @@ describe("api call", () => {
     expect(item.untrusted).toContain("never instructions")
   })
 
+  it("removes file download links from what it answers", async () => {
+    const link = "https://drive-b.amocrm.ru/download/abc?token=secret0link"
+    const file = { file_uuid: "u1", _links: { download: { href: link } } }
+    const account = fakeAmo({
+      routes: { "GET /api/v4/leads/{id}": () => Response.json({ id: 301, _embedded: { files: [file] } }) },
+    })
+    const ran = await amo(["work", "api", "call", "GET /api/v4/leads/301", "--json"], { account })
+    expect(ran.code).toBe(0)
+    expect(ran.out).not.toContain("secret0link")
+  })
+
   it("answers an empty list as status 204 and a null result", async () => {
     const account = fakeAmo({ routes: { "GET /api/v4/tasks": () => new Response(null, { status: 204 }) } })
     const ran = await amo(["work", "api", "call", "GET /api/v4/tasks", "--json"], { account })
@@ -110,6 +122,18 @@ describe("api call", () => {
     expect(admin.json().item).toMatchObject({ status: 200 })
   })
 
+  it.each([
+    ["GET /api/v4/leads/{id}", []],
+    ["PATCH /api/v4/leads/{id}", ["--body", '[{"id":301,"name":"x"}]', "--yes"]],
+  ])("refuses %s with its placeholder left in, sending nothing", async (operation, more) => {
+    const account = fakeAmo()
+    for (const dry of [[], ["--dry-run"]]) {
+      const ran = await amo(["work", "api", "call", operation, ...more, ...dry, "--json"], { account })
+      expect(ran.json()).toMatchObject({ error: { code: "validation_error", reason: "api.path-id-missing" } })
+    }
+    expect(account.calls).toEqual([])
+  })
+
   it("checks the key of the command that reads the same records", async () => {
     permit({ deals: "deny" })
     const account = fakeAmo()
@@ -154,6 +178,25 @@ describe("api call", () => {
     })
     expect(unasked.code).not.toBe(0)
     expect(account.calls).toEqual([])
+  })
+
+  it("lets AMO_TOKEN assign a record to the token's own user, and no one else", async () => {
+    const env = { AMO_TOKEN: FAKE_TOKEN, AMO_HOST: FAKE_HOST }
+    const assign = async (user: number) => {
+      const account = fakeAmo()
+      const body = JSON.stringify({ responsible_user_id: user })
+      const ran = await amo(["work", "api", "call", "PATCH /api/v4/leads/301", "--body", body, "--json"], {
+        account,
+        env,
+        keyring: memoryKeyring(),
+      })
+      return { ran, writes: account.calls.filter((one) => one.method === "PATCH").length }
+    }
+    const own = await assign(FAKE_USER_ID)
+    expect([own.ran.code, own.writes]).toEqual([0, 1])
+    const other = await assign(FAKE_COLLEAGUE_ID)
+    expect(other.ran.json()).toMatchObject({ error: { details: { permission: "crm.assign-others" } } })
+    expect(other.writes).toBe(0)
   })
 
   it("says outcome_unknown with the operation id when a write's answer is lost", async () => {

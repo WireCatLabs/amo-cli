@@ -65,7 +65,8 @@ const openProfile = async (command: Command, { readOnly }: { readOnly: boolean }
       chosen: crmSettingKey(account, "unassigned"),
     }
   }
-  const crm = () => (source ??= amoCrmSource(amo, { asked }))
+  // Only a sync copies: every other command reads `self` too (a non-admin's own clients), and must answer under `all`.
+  const crm = () => (source ??= amoCrmSource(amo, command.name() === "sync" ? { asked } : {}))
   const user = await userOf(command, amo)
   return {
     profile,

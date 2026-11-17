@@ -20,6 +20,7 @@ const OWN: [reason: string, code: string, message: string][] = [
   ["amo.blocked", "permission_error", "amoCRM blocks every request from here"],
   ["amo.filters-off", "validation_error", "the account has no API filter add-on, so amoCRM cannot narrow this list"],
   ["amo.scope-all-refused", "configuration_error", "amo never copies the whole CRM: set the scope to mine"],
+  ["api.path-id-missing", "validation_error", "the path still has a placeholder where the record's id belongs"],
   ["body.invalid", "validation_error", "--body or --params is not the JSON this call takes"],
   ["employee.delete", "permission_error", "only an amoCRM administrator deletes through amo"],
   ["employee.clear", "permission_error", "only an amoCRM administrator sets a field to nothing through amo"],

@@ -321,9 +321,11 @@ the main pipeline").
 - A company given to a colleague or taken off every chosen deal stays in the copy: cli-core has no cleanup pass for
   companies when the source names its deletions itself.
 - Two profiles on one account share its copy, which is keyed by the host. Each run names its sign-in's user
-  (`user` in `openProfile`, `src/commands/crm-shared.ts`, read from the saved sign-in with no network; `null` for
-  `AMO_TOKEN`), so a non-administrator's profile reads offline only its own user's deals, and `search all` finds none
-  of the rest (cli-core 0.676.0; test "a colleague's profile on the same account").
+  (`user` in `openProfile`, `src/commands/crm-shared.ts`), so a non-administrator's profile reads offline only its
+  own user's deals, and `search all` finds none of the rest (cli-core 0.676.0; test "a colleague's profile on the
+  same account"). A saved sign-in carries its user, read with no network. `AMO_TOKEN` names no user, so each command
+  asks the account once whose token it is, even a read of the copy: the copy's own sync user may be someone else, and
+  taking it would show that user's deals. Under `--offline` nobody is asked, and the reads show none.
 - Tasks and notes: a change landing in the milliseconds between two page reads of one busy second can still move a
   row past the read; a second with more pages than one run's whole budget never finishes. A deleted note stays in
   the copy (no note deletion is read). A note arrives done, so cli-core lists it in `changes list` both as added and

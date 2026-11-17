@@ -96,6 +96,11 @@ describe("command keys a raw call does the same as", () => {
     ["PATCH /api/v4/leads/1", { pipeline_id: 5002 }, ["deals.update", "deals.move"]],
     ["POST /api/v4/leads", [{ name: "x", status_id: 142 }], ["deals.create", "deals.close"]],
     ["POST /api/v4/leads", [{ name: "x", status_id: 50011 }], ["deals.create"]],
+    ["POST /api/v4/leads/unsorted/abc/accept", { user_id: 7002, status_id: 142 }, ["deals.create", "deals.close"]],
+    ["POST /api/v4/leads/unsorted/forms", [{ source_uid: "x" }], ["deals.create"]],
+    ["POST /api/v4/leads/unsorted/abc/link", { link: { entity_id: 1 } }, ["deals.update"]],
+    ["GET /api/v4/tasks", undefined, ["activities.list"]],
+    ["GET /api/v4/tasks/1", undefined, ["activities.list"]],
     [
       "POST /api/v4/leads/complex",
       [{ name: "x", status_id: 143 }],
@@ -111,7 +116,6 @@ describe("command keys a raw call does the same as", () => {
     ["GET /api/v4/users", undefined, ["users.list"]],
     ["GET /api/v4/users/1", undefined, ["users.show"]],
     ["GET /api/v4/contacts/custom_fields", undefined, ["fields.list"]],
-    ["GET /api/v4/tasks", undefined, []],
     ["POST /api/v4/tasks", [{ text: "x" }], []],
   ])("%s", (raw, body, keys) => {
     expect(commandKeysOf(op(raw), body)).toEqual(keys)
@@ -126,6 +130,8 @@ describe("command keys a raw call does the same as", () => {
 
   it("checks crm.assign-others for tasks and for the contacts and companies nested in a complex lead (SEC-7)", () => {
     expect(assignsOthers(op("POST /api/v4/tasks"), [{ responsible_user_id: 9 }], () => "7001")).toBe(true)
+    expect(assignsOthers(op("POST /api/v4/leads/unsorted/abc/accept"), { user_id: 9 }, () => "7001")).toBe(true)
+    expect(assignsOthers(op("POST /api/v4/leads/unsorted/abc/accept"), { user_id: 7001 }, () => "7001")).toBe(false)
     const nested = [{ name: "x", _embedded: { contacts: [{ first_name: "A", responsible_user_id: 9 }] } }]
     expect(assignsOthers(op("POST /api/v4/leads/complex"), nested, () => "7001")).toBe(true)
     const company = [{ name: "x", _embedded: { companies: [{ name: "B", responsible_user_id: 9 }] } }]
@@ -173,4 +179,11 @@ describe("raw reads of clients, which only an administrator makes (SEC-6, NEED-2
   ])("%s %j: %s", (raw, query, reads) => {
     expect(readsClients(op(raw), query)).toBe(reads)
   })
+})
+
+it("counts with[] and with[0] as with when a raw read embeds clients", () => {
+  const leads = matchOperation("GET /api/v4/leads").operation
+  for (const query of [{ with: "contacts" }, { "with[]": ["contacts"] }, { "with[0]": "companies" }])
+    expect(readsClients(leads, query)).toBe(true)
+  expect(readsClients(leads, { "with[]": ["loss_reason"] })).toBe(false)
 })

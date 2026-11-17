@@ -20,8 +20,10 @@ const check: SetupCheck = async ({ command, settings, secrets }) => {
   const typed = secrets.token?.trim()
   if (typed) {
     const { who, signIn, account } = await checkedToken(command, origin, typed)
-    const { env, profile, keyring } = contextOf(command)
-    // A request prefers an integration's sign-in to the token, so it would hide the token just proven.
+    const { env, profile, keyring, tokens } = contextOf(command)
+    // A request prefers an integration's sign-in to the token, so it would hide the token just proven. The token is
+    // saved first, as `session start` does: a save that fails leaves the integration's sign-in in place.
+    tokens.write(profile, signIn)
     appStorage(env, profile, keyring).remove()
     return { ...who, keep: { secrets: { token: signIn }, account } }
   }

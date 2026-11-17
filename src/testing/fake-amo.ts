@@ -688,6 +688,9 @@ const handlersFor = (data: Data, options: FakeAmoOptions, now: () => number): Re
       return hal({
         ...data.account,
         ...(asked.has("is_api_filter_enabled") ? { is_api_filter_enabled: options.apiFilter !== false } : {}),
+        ...(asked.has("datetime_settings")
+          ? { _embedded: { datetime_settings: { timezone: "Europe/Moscow", timezone_offset: "+03:00" } } }
+          : {}),
         _links: { self: { href: href("/api/v4/account") } },
       })
     },
