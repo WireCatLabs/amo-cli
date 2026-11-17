@@ -1,6 +1,6 @@
 {
   "name": "@wirecat/amo-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read and change an amoCRM or Kommo account's CRM — deals, contacts, companies — from the terminal, scripts and AI agents",
   "license": "Apache-2.0",
   "author": "Viacheslav Ptsarev",
