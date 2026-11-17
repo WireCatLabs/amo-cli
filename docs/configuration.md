@@ -1,11 +1,11 @@
 # Settings
 
-Decide what your AI agent may do in your amoCRM or Kommo account before you hand it over. Read only, change deals but
-never message a client, or ask you first: each profile keeps its own answer.
+Change how `amo` works for one account, or for every account on this computer, with one command, and see where each
+value came from. You change only the few that matter to you, and the rest keep their defaults.
 
-An agent then works inside the limits you set. It reads and moves deals where you allow it, and a write you denied
-stops before any request reaches the account. The same settings decide which deals `sync` copies and whether tasks
-and calls come with them.
+You decide whose deals `sync` copies, whether tasks and calls come with them, which stages open a task on your
+computer, and what an agent may do. Only you can loosen a permission or change what a sync copies: an agent that
+tries is refused.
 
 Settings live in one file, `config.json`, in the folder `amo doctor` shows. Each profile has its own part, and
 `defaults` apply to every profile. `amo work config show` lists each setting and where it came from: the file, a
@@ -19,6 +19,7 @@ variable or the default.
 4. [Tasks and calls](#tasks-and-calls)
 5. [A task when a deal enters a stage](#a-task-when-a-deal-enters-a-stage)
 6. [Run records](#run-records)
+7. [Variables](#variables)
 
 ## See and change a setting
 
@@ -31,33 +32,12 @@ amo work config unset limit
 ## Permissions
 
 `permissions` decides what a command may do for this profile: `allow`, `ask`, `readonly` or `deny`, per permission
-key. Each command has a key, such as `deals.close`, and so does each operation of the amoCRM API. An operation's key is
-the path's words and the verb: `GET /api/v4/leads/{id}` is `api.leads.id.get`, so `api.leads` covers every operation
-on deals.
+key. Over MCP `ask` does not ask: the write goes ahead. The keys, their built-in levels and how to keep an agent's
+writes yours are on [Permissions](permissions.md).
 
 ```sh
 amo work config set permissions.deals.close deny
 ```
-
-What a new profile allows:
-
-- **Allowed:** what `amo`'s own commands read, such as deals, contacts, companies, pipelines, fields, users, tasks and
-  events, and creating and changing deals, contacts and companies.
-- **Asks first:** every other read, such as notes or unsorted, other writes, and every delete.
-- **Denied, reads too:** conversations, chats, Salesbots, webhooks, widgets, website buttons, calls, and switching users
-  on or off.
-- **Denied writes:** adding users, and writing tasks, roles and lead sources. `crm.assign-others` is denied too, so no
-  write gives a deal, a task or a contact to another user.
-
-`api call` also checks the key of the command that does the same thing, such as `deals.update` for
-`PATCH /api/v4/leads`, so a raw call cannot get round a command's level.
-
-Some things only the account's administrator does through `amo`, whatever the permissions say: deleting, setting a
-field to nothing, unlinking records, and reading contacts, companies, notes and events through `api call`.
-
-Over MCP there is no one to ask, so `ask` lets the command run. Set a key to `readonly` or `deny` to stop an agent.
-`amo work mcp serve --permission deals.close=deny` makes a key stricter for one server only, and never looser.
-`AMO_READ_ONLY=1` refuses every write, whatever the permissions say.
 
 ## Which deals sync copies
 
@@ -71,14 +51,14 @@ amo work config set crm.amocrm:example.amocrm.ru.unassigned 7001,7002
 amo work sync
 ```
 
-You set this yourself at a terminal, since an agent's run is refused it. A user who is not an administrator can choose only themselves. No setting copies the whole CRM. Any other client is
-read live with `people` or `organizations`.
+Only you set this, since an agent's run is refused it. A user who is not an administrator can choose only
+themselves. No setting copies the whole CRM. Any other client is read live with `people` or `organizations`.
 
 ## Tasks and calls
 
 `crm.amocrm:<address>.activities` is off by default. Turned on, the next `sync` copies the tasks, comments and calls on
 your deals and their clients from the last 90 days. [Tasks and what changed](usage.md#tasks-and-what-changed) shows the
-command. Like the choice of deals, only you set it, at a terminal.
+command. Like the choice of deals, only you set it.
 
 ## A task when a deal enters a stage
 
@@ -96,12 +76,24 @@ amo work sync
 ```
 
 `amo` reads the account's stage history, so a deal that passed through a stage between two syncs still gets that
-stage's task. Moves made before the setting was first set open none. Only you set it, at a terminal. To stop,
+stage's task. Moves made before the setting was first set open none. Only you set it. To stop,
 `amo work config unset crm.amocrm:example.amocrm.ru.stage-tasks`.
 
 ## Run records
 
 A command that fails is kept as a run, for `amo runs list` and `runs show`. `api call` and `session status --check`
 are kept when they succeed too, unless `record` is `false` (then only failures) or they ran with `--no-record`.
-`record_input` decides whether a run keeps the words you typed. It is `true` unless you set it to `false`. Secrets are
-masked either way, as [security](security.md) shows.
+`record_input` decides whether a run keeps the words you typed: `true` (the default), `false`, or `failed` for failed
+runs only. Secrets are masked either way, as [security](security.md) shows.
+
+## Variables
+
+A variable set for one shell or one timer comes before the file:
+
+- `AMO_PROFILE` names the profile, so a command can leave it out.
+- `AMO_READ_ONLY=1` refuses every write, whatever the permissions say.
+- `AMO_TOKEN` with `AMO_HOST` signs in with a long-lived token for that run only, without the keyring. `AMO_HOST` is
+  the account's address, and `AMO_TOKEN` without it is an error.
+- `AMO_AMOCRM_CLIENT_SECRET` gives the integration's secret key to `session start --client-id`.
+- `AMO_CONFIG_DIR` and `AMO_STATE_DIR` move the settings and the state to other folders. A sign-in made with them is
+  kept apart from your usual one.

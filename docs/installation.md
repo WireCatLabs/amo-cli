@@ -7,9 +7,9 @@ account administrator makes.
 Your agent then answers which deals are open, moves a deal to the next stage or finds a client, from a terminal or over
 MCP, as far as the permissions you set allow. You run the same commands yourself, or from a script.
 
-`amo` is a WireCat command-line tool, a program you run by typing its name in a terminal. You connect it once per
-account. One private integration serves both ways of signing in: a token you paste, or a sign-in in the browser. The
-one prerequisite is an account administrator, who makes the integration.
+`amo` is a WireCat command-line tool, a program you or your agent run by its name. You connect it once per account,
+and `amo work setup` asks each question in turn. One private integration serves both ways of signing in: a token you
+paste, or a sign-in in the browser. The one prerequisite is an account administrator, who makes the integration.
 
 **On this page:**
 
@@ -18,7 +18,7 @@ one prerequisite is an account administrator, who makes the integration.
 3. [Sign in with a key](#sign-in-with-a-key)
 4. [Sign in through the integration](#sign-in-through-the-integration)
 5. [Which one to choose](#which-one-to-choose)
-6. [Connect in WireCat Desktop](#connect-in-wirecat-desktop)
+6. [Connect step by step](#connect-step-by-step)
 7. [Sign out and revoke access](#sign-out-and-revoke-access)
 8. [Next: the first sync](#next-the-first-sync)
 
@@ -30,21 +30,17 @@ later. Node 23 is not supported.
 ```sh
 npm install -g @wirecat/amo-cli
 amo --version
+amo skill install   # the agent skill, for Claude Code, Codex, Gemini CLI and OpenClaw
 amo doctor
 ```
 
-`amo doctor` needs no network and opens no keyring. It shows the version, where settings live, the profiles that
-exist, and whether other users of the computer can read the settings.
-
-WireCat Desktop will install `amo` for you once amoCRM is in its catalog. That comes with the next Desktop release.
+An agent with no terminal, such as Claude Desktop, uses `amo` over [MCP](mcp.md) instead. `amo doctor` needs no
+network and opens no keyring. It shows the version, where settings live, the profiles that exist, and whether other
+users of the computer can read the settings.
 
 ## Create the integration
 
 An account administrator does this once. The same integration serves the key and the browser sign-in.
-
-<!-- TODO screenshots, when the files exist:
-  src/setup/assets/01-amomarket-menu.png (the ⋯ menu in амоМаркет)
-  src/setup/assets/02-integration-form.png (the integration form) -->
 
 In amoCRM (`<subdomain>.amocrm.ru`):
 
@@ -69,10 +65,6 @@ in the name, the description and the same **Redirect URL**. **Allow access** has
 ## Sign in with a key
 
 The key is amoCRM's long-lived token. It acts with the rights of the administrator who made it.
-
-<!-- TODO screenshots, when the files exist:
-  src/setup/assets/03-keys-tab.png (the «Ключи» tab)
-  src/setup/assets/04-generate-token.png (the end date and the token) -->
 
 1. In the integration, open the **«Ключи»** tab (Kommo: **Keys and scopes**) and click **«Сгенерировать токен»**
    (Kommo: **Generate long-lived token**).
@@ -121,10 +113,9 @@ This sign-in uses OAuth: you allow the integration in the browser, and each pers
   at least once in 3 months. After a longer pause, sign in again
   ([amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
 
-## Connect in WireCat Desktop
+## Connect step by step
 
-This comes with the next Desktop release, once amoCRM is in its catalog. Desktop then asks the questions `amo` itself
-describes, so they match the terminal:
+`amo work setup` asks the questions one at a time, checks the answers and saves them only when the check passes:
 
 1. **Which account?** The address you open the CRM at.
 2. **Create a private integration.** The steps of [create the integration](#create-the-integration).
@@ -133,7 +124,7 @@ describes, so they match the terminal:
    if the account answers. A refused token takes you back to the token step.
 5. **Connected.** The profile is ready.
 
-Desktop signs in with the key. The browser sign-in is the terminal command shown under **Advanced** on the last step.
+It signs in with the key. The browser sign-in is the command shown under **Advanced** on the last step.
 
 ## Sign out and revoke access
 

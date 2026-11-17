@@ -1,7 +1,7 @@
 # Use it
 
-Know where each of your deals stands and what changed overnight, without opening the CRM. amoCRM and Kommo show it in
-the browser, and `amo` brings it to your terminal and your AI agent.
+Find a deal, move it or see what changed overnight with one short command, the same one your agent runs. The amoCRM
+API speaks in pipeline and stage ids and field ids, and `amo` takes stage names and field labels instead.
 
 Your agent answers which deals stand in a stage, how the funnel looks this month and which tasks are overdue. It moves
 a deal, closes it with the reason or updates a client when you ask, and every morning it can send you a digest of what
@@ -51,11 +51,14 @@ amo work sync
 amo work deals list status:open
 ```
 
-Any other client is read live with `people` or `organizations`. Run `sync` again to bring the copy up to date. This
-keeps it fresh with a timer:
+Any other client is read live with `people` or `organizations`. Run `sync` again to bring the copy up to date: it
+reads only what changed since the last one. A sync stopped by `--max-pages` goes on from there the next time. This
+keeps the copy fresh with a timer:
 
 ```sh
 amo work schedule command crm --every 1h -- sync
+amo work store status            # how far each kind is, and how many are stored
+amo work sync --rescan           # everything again, every id too
 ```
 
 ## Read your deals
@@ -78,8 +81,8 @@ amo work people list "Anna"
 amo work organizations show "Example LLC"
 ```
 
-A contact on your own deals comes with its phones and e-mails. For a user who is not an administrator, amoCRM limits
-how many other contacts can be opened in a day.
+A contact on your own deals comes with its phones and e-mails. A user who is not an administrator sees the phones
+and e-mails of at most 100 other contacts and companies a day, counted on this computer.
 
 ## Change a deal
 
@@ -92,7 +95,11 @@ amo work deals update deal:12 --amount 18000 --dry-run
 A stage is named by its name in the pipeline. `close` marks a deal won or lost the CRM's own way, with the reason.
 `--field` sets one of the account's own fields by its label, as `amo work fields list deals` prints them. A contact's
 job title is one of those fields too. Every change answers an `operation_id`, and `--dry-run` shows what it would do
-and the permissions it checks, and sends nothing. amoCRM has no call that deletes a deal.
+and the permissions it checks, and sends nothing. amoCRM has no call that deletes a deal, so close it as lost
+instead. Files on deals and contacts are not supported yet.
+
+When the answer to a write is lost, the error says `outcome_unknown` and `amo` does not send it again. amoCRM may have
+made the change, so run `sync`, look at the deal with `deals show`, and write again only if the change is not there.
 
 ## Tasks and what changed
 
@@ -143,22 +150,8 @@ JSON on stderr, with a code to branch on. The [command reference](commands.md) l
 
 `amo skill install` puts the tool's skill where Claude Code, Codex, Gemini CLI and OpenClaw look for it.
 `amo skill install --for hermes` also adds that folder to Hermes Agent's own settings, so a bare `skill install`
-leaves Hermes out. `amo work mcp serve` serves the profile's commands over MCP, on stdin and stdout:
+leaves Hermes out. An agent with a skill runs the same commands as you.
 
-```sh
-claude mcp add amo -- amo work mcp serve
-```
-
-The server offers every command, the ones that write included. The profile's permissions decide what runs, as
-[settings](configuration.md#permissions) shows.
-
-For ChatGPT and Claude in the browser, the command below serves on `127.0.0.1` (port 8765, or `--port`) behind your
-own tunnel. Put your tunnel's address in place of the example `https://laptop.example.ts.net`:
-
-```sh
-amo work mcp serve --http --public-url https://laptop.example.ts.net
-```
-
-A browser app logs in with a one-time code that the command prints, and `amo work mcp revoke` ends every login.
-`amo work mcp server start` runs the same server in the background, `mcp server status` shows its port, the login
-code and the apps logged in, and `mcp server stop` ends it.
+An app with no terminal, such as Claude Desktop, or ChatGPT and Claude in the browser, connects to `amo` over MCP, as
+[MCP](mcp.md) shows. Before it does, decide what it may change, as [permissions](permissions.md#agents-and-mcp)
+shows: over MCP nobody is there to answer a question, so a write at `ask` goes ahead.
