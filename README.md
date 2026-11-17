@@ -45,8 +45,6 @@ Agent:  (runs amo work deals move deal:12 "Negotiation")
         Done. "Example kitchen" is in Negotiation now.
 ```
 
-*Invented deals, illustrative output.*
-
 ## Why amo
 
 - **A copy of your deals on your computer.** `sync` copies your deals with their contacts and companies, and the next
