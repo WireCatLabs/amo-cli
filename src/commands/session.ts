@@ -31,7 +31,15 @@ import { Command } from "commander"
 import { accountOrigin, decodeSignIn, encodeSignIn } from "../amo/account.js"
 import { appSignIn, appSourceOf, appStorage, RELAY_URL } from "../amo/oauth.js"
 import { configuration } from "../config.js"
-import { type AmoEnvironment, appAuthFor, contextOf, storedSignIn, transportFor, withAccount } from "../context.js"
+import {
+  type AmoEnvironment,
+  appAuthFor,
+  contextOf,
+  storedSignIn,
+  transportFor,
+  withAccount,
+  withoutKeyring,
+} from "../context.js"
 import { IDENTITY } from "../identity.js"
 import { accountUser } from "../whoami.js"
 
@@ -49,7 +57,10 @@ const tokensHere = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined) =
 
 /** The account host and user a profile's saved sign-in reaches, either kind; one from `AMO_TOKEN` is no profile's. */
 export const signedInAs = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined, profile: string) => {
-  const app = appStorage(env, profile, keyring).read()?.account
+  const app = withoutKeyring(
+    () => appStorage(env, profile, keyring).read()?.account,
+    () => tokensHere(env, keyring).read(profile),
+  )
   if (app) return { host: new URL(app.host).host, userId: app.userId }
   const saved = tokensHere(env, keyring).read(profile)
   if (!saved || saved.source === "environment") return undefined

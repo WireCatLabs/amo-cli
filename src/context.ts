@@ -1,4 +1,4 @@
-import { CliError, type SleepLike } from "@wirecat/cli-base"
+import { CliError, isCliError, type SleepLike } from "@wirecat/cli-base"
 import type { FetchLike } from "@wirecat/cli-base/http"
 import {
   type BaseEnvironment,
@@ -53,14 +53,31 @@ export const HOST_VARIABLE = `${IDENTITY.envPrefix}_HOST`
 
 /** The profile's integration sign-in, read with no network. */
 export const appAuthFor = (command: Command): AppAuth | undefined => {
-  const { env, profile, keyring, environment } = contextOf(command)
-  return appAuthOf({
-    env,
-    profile,
-    keyring,
-    ...(environment.fetch ? { fetch: environment.fetch as typeof fetch } : {}),
-    signal: environment.signal,
-  })
+  const { env, profile, keyring, environment, tokens } = contextOf(command)
+  return withoutKeyring(
+    () =>
+      appAuthOf({
+        env,
+        profile,
+        keyring,
+        ...(environment.fetch ? { fetch: environment.fetch as typeof fetch } : {}),
+        signal: environment.signal,
+      }),
+    () => tokens.read(profile),
+  )
+}
+
+/**
+ * The integration's sign-in when the keyring does not answer: none, if the profile's long-lived token is found
+ * elsewhere (a file), since each `session start` forgets the other kind; else cli-base's `keyring.unreachable`.
+ */
+export const withoutKeyring = <T>(read: () => T | undefined, token: () => unknown): T | undefined => {
+  try {
+    return read()
+  } catch (error) {
+    if (isCliError(error) && error.details.reason === "keyring.unreachable" && token() !== undefined) return undefined
+    throw error
+  }
 }
 
 /**
