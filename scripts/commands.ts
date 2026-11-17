@@ -16,12 +16,26 @@ const page = commandsPage({
   text: {
     banner: "<!-- Generated from the command tree by pnpm generate. Do not edit. -->",
     title: "Commands",
-    intro: `Every command, option and exit code, generated from the program itself. For the same list as JSON, run
-\`${IDENTITY.command} commands --json\`.
+    intro: `Look up any \`${IDENTITY.command}\` command, its options and what it answers, and trust that it matches the
+version you run: this page is generated from the program itself.
+
+Your AI agent reads the same list as JSON with \`${IDENTITY.command} commands --json\`, and picks a command and its
+options from there. Each exit code means one kind of failure, so a script or an agent can tell what went wrong.
 
 **The first word is the profile**, a name you choose: \`${IDENTITY.command} personal config show\`. \`${IDENTITY.envPrefix}_PROFILE\`
 does the same for a whole shell session. No profile is assumed: a command that uses an account stops without one and
-lists the profiles on this computer.`,
+lists the profiles on this computer.
+
+**On this page:**
+
+1. [Options for every command](#options-for-every-command)
+2. [Deals](#amo-deals)
+3. [Pipelines](#amo-pipelines)
+4. [Contacts](#amo-people)
+5. [Companies](#amo-organizations)
+6. [What changed](#amo-changes)
+7. [The API](#amo-api)
+8. [Exit codes](#exit-codes)`,
     globalHeading: "Options for every command",
     globalIntro: "",
     mutates: "**Changes something in the service.**",
