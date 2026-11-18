@@ -21,7 +21,7 @@ the answer, stop.
 
 Find only the commands the task needs: `amo commands info deals move --json` is one command's contract,
 `amo help deals list` the short help with its query fields; `amo commands --json` (the whole tree) is for an overview,
-not before every task. `amo doctor --json` says what is set up. None needs an account.
+not before every task. `amo guide` lists scenarios; `amo doctor --json` says what is set up. None needs an account.
 
 ## The profile
 

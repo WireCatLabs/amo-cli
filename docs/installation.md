@@ -19,8 +19,9 @@ paste, or a sign-in in the browser. The one prerequisite is an account administr
 4. [Sign in through the integration](#sign-in-through-the-integration)
 5. [Which one to choose](#which-one-to-choose)
 6. [Connect step by step](#connect-step-by-step)
-7. [Sign out and revoke access](#sign-out-and-revoke-access)
-8. [Next: the first sync](#next-the-first-sync)
+7. [Connect in WireCat Desktop](#connect-in-wirecat-desktop)
+8. [Sign out and revoke access](#sign-out-and-revoke-access)
+9. [Next: the first sync](#next-the-first-sync)
 
 ## Install
 
@@ -125,6 +126,13 @@ This sign-in uses OAuth: you allow the integration in the browser, and each pers
 5. **Connected.** The profile is ready.
 
 It signs in with the key. The browser sign-in is the command shown under **Advanced** on the last step.
+
+## Connect in WireCat Desktop
+
+[WireCat Desktop](https://wirecat.dev/en/docs/desktop) installs `amo` from its Tools page, from version
+0.7.1. Its window asks the same questions as `amo work setup`, because `amo` describes them, and checks the token the
+same way before it saves anything. Like the terminal, it signs in with the key; the browser sign-in is the command
+under **Advanced** on the last step.
 
 ## Sign out and revoke access
 

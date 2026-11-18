@@ -1,11 +1,11 @@
 import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { annotate } from "@wirecat/cli-base/commands"
-import { REMOTE_READ, run as runShared } from "@wirecat/cli-core/cli"
+import { checkGuide, REMOTE_READ, run as runShared } from "@wirecat/cli-core/cli"
 import { Command } from "commander"
 import { expect, it } from "vitest"
 import { IDENTITY } from "./identity.js"
-import { definition, run } from "./program.js"
+import { createProgram, definition, run } from "./program.js"
 
 const ran = async (argv: string[]) => {
   const out: string[] = []
@@ -31,6 +31,16 @@ it("lists the required root commands and config", async () => {
   expect(JSON.parse(out).commands).toEqual(
     expect.arrayContaining(required.map((name) => expect.objectContaining({ name }))),
   )
+})
+
+it("guide lists the scenarios, and every step is a command amo has", async () => {
+  const { code, out } = await ran(["work", "guide", "--json"])
+  expect(code).toBe(0)
+  expect(JSON.parse(out).items.map((one: { name: string }) => one.name)).toEqual(
+    expect.arrayContaining(["first-sync", "keep-in-sync", "safe-agent-writes"]),
+  )
+  expect((await ran(["work", "guide", "safe-agent-writes"])).out).toContain("permissions.deals.move readonly")
+  expect(await checkGuide(createProgram, { packageRoot: process.cwd() })).toEqual([])
 })
 
 it("doctor answers without a config file", async () => {

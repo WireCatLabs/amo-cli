@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { resolvePaths } from "@wirecat/cli-base"
 import {
   appDoctorCommand,
@@ -6,6 +7,7 @@ import {
   commandsCommand,
   configCommand,
   createProgram as createSharedProgram,
+  guideCommand,
   outputFor,
   ProfileTokenStore,
   type ProgramDefinition,
@@ -94,6 +96,7 @@ export const definition = (): ProgramDefinition => ({
     scheduleCommand(),
     appDoctorCommand(IDENTITY, configuration, { packageName: PACKAGE }),
     skillCommand(IDENTITY, SKILL),
+    guideCommand(IDENTITY, { directory: fileURLToPath(new URL("../scenarios", import.meta.url)) }),
     mcpCommand(),
     upgradeCommand(IDENTITY, PACKAGE, (command) => ({
       ...outputFor(command),

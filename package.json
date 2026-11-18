@@ -20,6 +20,7 @@
   "files": [
     "dist",
     "skills",
+    "scenarios",
     "contracts/wirecat.json",
     "/README.md",
     "CHANGELOG.md",
@@ -30,6 +31,7 @@
     "typecheck": "tsc --build --force --emitDeclarationOnly && tsc -p tsconfig.test.json && tsc -p tsconfig.scripts.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "docs:images": "node docs/images/src/render.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:slow": "vitest run --reporter=json --outputFile=coverage/tests.json >/dev/null; cli-dev slow-tests",
