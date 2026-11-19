@@ -150,7 +150,8 @@ JSON on stderr, with a code to branch on. The [command reference](commands.md) l
 
 `amo skill install` puts the tool's skill where Claude Code, Codex, Gemini CLI and OpenClaw look for it.
 `amo skill install --for hermes` also adds that folder to Hermes Agent's own settings, so a bare `skill install`
-leaves Hermes out. An agent with a skill runs the same commands as you.
+leaves Hermes out. An agent with a skill runs the same commands as you. `amo guide` lists scenarios for common tasks,
+each as commands in order and why.
 
 An app with no terminal, such as Claude Desktop, or ChatGPT and Claude in the browser, connects to `amo` over MCP, as
 [MCP](mcp.md) shows. Before it does, decide what it may change, as [permissions](permissions.md#agents-and-mcp)

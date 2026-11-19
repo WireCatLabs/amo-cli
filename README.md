@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/WireCatLabs/amo-cli/main/docs/images/social-preview.png" alt="amoCRM and Kommo CLI for AI agents" width="100%">
+</p>
+
 # amo: amoCRM and Kommo CLI for AI agents
 
 <p align="center">

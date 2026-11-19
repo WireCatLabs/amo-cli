@@ -28,7 +28,7 @@ Gemini CLI and OpenClaw look; `--for hermes` adds Hermes Agent too.
 6. **Keep it fresh**, only if the owner asks: `amo work schedule command crm --every 1h -- sync` installs a timer on
    this computer. A morning digest:
    `amo work schedule command crm-digest --at 08:30 -- changes list --format report`.
-7. **Permissions** before an agent gets the CRM: [mcp.md](mcp.md).
+7. **Permissions** before an agent gets the CRM: [mcp.md](mcp.md) and `amo guide safe-agent-writes`.
 
 ## Two settings only the owner sets
 

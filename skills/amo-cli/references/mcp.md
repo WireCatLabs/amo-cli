@@ -32,7 +32,7 @@ amo work config set permissions.deals.move readonly
 amo work config set permissions.deals.close deny
 ```
 
-At a terminal `ask` still asks.
+At a terminal `ask` still asks. `amo guide safe-agent-writes` walks through the same.
 
 Guides for people: [MCP](https://github.com/WireCatLabs/amo-cli/blob/main/docs/mcp.md),
 [permissions](https://github.com/WireCatLabs/amo-cli/blob/main/docs/permissions.md).
