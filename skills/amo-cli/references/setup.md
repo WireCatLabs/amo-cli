@@ -8,13 +8,15 @@ Gemini CLI and OpenClaw look; `--for hermes` adds Hermes Agent too.
    «Создать интеграцию») or Kommo (Settings → Integrations → Create integration), with access to the account's data.
    Its **long-lived token** (the «Ключи» tab, Kommo: Keys and scopes) is the password: anyone who has it acts as the
    administrator who made it. **Never ask the owner to paste it into the conversation.** `amo work setup`, in the
-   owner's terminal, walks them through it.
+   owner's terminal, walks them through it. An owner who is not an administrator (no амоМаркет in their menu) asks an
+   administrator for that token; the setup's "not an administrator" answer shows the request to send.
 3. **Sign in:** the owner runs `amo work session start --host https://<subdomain>.amocrm.ru` in their own terminal,
    which asks for the token hidden, checks it against the account and keeps it with the address. `work` is the
    profile, a name the owner picks for this account. Then `amo work session status --check --json` says which account
    and user the token acts as. `amo session list` lists the profiles on this computer.
    - With `--client-id <integration id>` the owner signs in through the integration in the browser instead, and acts
-     with their own rights. `amo` renews those tokens.
+     with their own rights. `amo` renews those tokens. amoCRM offers only accounts where the person is an
+     administrator, so this way is for administrators.
    - `AMO_TOKEN` with `AMO_HOST` (the account's address) signs in without a saved sign-in, for a script. `AMO_TOKEN`
      alone is refused (`account.host-missing`).
 4. **Choose whose deals to copy.** A sync copies the deals of the sign-in's own user and the clients on them. An

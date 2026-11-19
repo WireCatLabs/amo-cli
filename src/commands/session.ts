@@ -224,6 +224,8 @@ const startCommand = () =>
         "The token acts with the rights of the administrator who made it. With --client-id it signs in through " +
         "that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens " +
         `act with the rights of the user who signs in; the integration's Redirect URI must be ${RELAY_URL}. ` +
+        "amoCRM lets only an account administrator allow that sign-in, so a user who is not one signs in with a " +
+        "token an administrator made. " +
         "Each sign-in forgets the profile's other kind",
     )
     .requiredOption("--host <address>", "the account's address, such as https://example.amocrm.ru, kept as given")

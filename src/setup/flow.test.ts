@@ -134,6 +134,17 @@ describe("the setup flow", () => {
     expect(new ProfileTokenStore({ app: IDENTITY, env: {}, keyring }).signedIn("work")).toBe(true)
   })
 
+  it("**a user who is not an administrator is sent to ask one for the token**, and the token saves as usual", async () => {
+    const dry = await amo(["work", "setup", "apply", "--dry-run", "--json"], {
+      keyring: memoryKeyring(),
+      env: { AMO_CONFIG_DIR: configs() },
+      stdin: JSON.stringify({ host: FAKE_ORIGIN, role: "member" }),
+    })
+    expect(dry.json()).toMatchObject({ item: { path: ["account", "role", "ask-admin", "token", "check"] } })
+    const saved = await apply({ host: FAKE_ORIGIN, role: "member", token: FAKE_TOKEN })
+    expect([saved.code, saved.error()]).toEqual([0, undefined])
+  })
+
   it("**session start keeps the address the flow shows** when the profile is edited", async () => {
     const env = { AMO_CONFIG_DIR: configs() }
     const keyring = memoryKeyring()

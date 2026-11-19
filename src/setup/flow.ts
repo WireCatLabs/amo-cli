@@ -47,6 +47,8 @@ const check: SetupCheck = async ({ command, settings, secrets }) => {
   return { ...who, keep: { account: `${who.account}:${who.user.id}` } }
 }
 
+const MEMBER = { field: "role", is: "member" } as const
+const OWN_DEALS = "amo <profile> users list\namo <profile> config set crm.amocrm:example.amocrm.ru.unassigned 7001"
 const OAUTH_COMMAND = "amo <profile> session start --host https://<subdomain>.amocrm.ru --client-id <integration ID>"
 
 export const amoSetup = defineSetup({
@@ -69,7 +71,32 @@ export const amoSetup = defineSetup({
           placeholder: "account.host.placeholder",
         },
       ],
-      next: "integration",
+      next: "role",
+    },
+    role: {
+      title: "role.title",
+      blocks: [
+        { type: "text", text: "role.intro" },
+        {
+          type: "choice",
+          id: "role",
+          optional: true,
+          options: [
+            { value: "admin", label: "role.admin", hint: "role.admin.hint" },
+            { value: "member", label: "role.member", hint: "role.member.hint" },
+          ],
+        },
+      ],
+      next: [{ when: MEMBER, to: "ask-admin" }, { to: "integration" }],
+    },
+    "ask-admin": {
+      title: "ask.title",
+      blocks: [
+        { type: "text", text: "ask.body" },
+        { type: "note", role: "warning", text: "ask.rights" },
+        { type: "text", text: "ask.later" },
+      ],
+      next: "token",
     },
     integration: {
       title: "integration.title",
@@ -88,7 +115,8 @@ export const amoSetup = defineSetup({
     token: {
       title: "token.title",
       blocks: [
-        { type: "text", text: "token.where" },
+        { type: "text", text: "token.where", when: { not: MEMBER } },
+        { type: "text", text: "token.member", when: MEMBER },
         { type: "input", id: "token", secret: "token", input: "password", label: "token.label", hint: "token.hint" },
         { type: "note", role: "tip", text: "token.rights" },
       ],
@@ -118,10 +146,13 @@ export const amoSetup = defineSetup({
       kind: "done",
       title: "done.title",
       blocks: [
+        { type: "text", text: "done.own", when: MEMBER },
+        { type: "code", code: OWN_DEALS, copy: true, when: MEMBER },
         { type: "text", text: "done.body" },
         { type: "code", code: "amo <profile> sync\namo <profile> deals list status:open", copy: true },
         {
           type: "group",
+          when: { not: MEMBER },
           role: "details",
           title: "done.oauth.title",
           blocks: [
