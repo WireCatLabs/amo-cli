@@ -21,5 +21,17 @@
   "done.title": "Connected",
   "done.body": "The profile is ready. Copy your deals and their clients into WireCat, then list the open ones:",
   "done.oauth.title": "Advanced: sign in through the integration instead",
-  "done.oauth": "With the integration's ID and secret key, each person signs in in the browser and acts with their own rights. Run this in a terminal; the secret key is asked hidden:"
+  "done.oauth": "Instead of a token, an administrator can sign in through the integration in the browser, with its ID and secret key, and amo renews that sign-in itself. amoCRM lets only an account's administrators allow access this way. Run this in a terminal; the secret key is asked hidden:",
+  "role.title": "Are you an administrator of this account?",
+  "role.intro": "Only an amoCRM account administrator can create the integration and its token. If you are not one, an administrator makes the token for you.",
+  "role.admin": "Yes, I am an administrator",
+  "role.admin.hint": "You see амоМаркет in the menu on the left and can create integrations.",
+  "role.member": "No, I am a user",
+  "role.member.hint": "There is no амоМаркет in your menu. An administrator sends you the token.",
+  "ask.title": "Ask an administrator for the token",
+  "ask.body": "Send an administrator of your account this request:\n\n> Please create a private WireCat integration in амоМаркет and send me its long-lived token. How: https://wirecat.dev/en/docs/amo/installation\n\nThe administrator creates the integration, clicks **«Сгенерировать токен»** on its **«Ключи»** tab and passes you the token. The token works like a password: pass it through a password manager, not a group chat.",
+  "ask.rights": "An amoCRM long-lived token acts with the rights of the administrator who made it. With it you see and can change what that administrator can. amo still stops agents' changes with its permissions.",
+  "ask.later": "When you have the token, go on to the next step and paste it.",
+  "token.member": "Paste the token the administrator sent you. If it is lost, the administrator can make a new one on the **«Ключи»** tab of the same integration.",
+  "done.own": "The token is the administrator's, so a sync copies the administrator's deals at first. Find your own id in the list of users and put it in place of 7001, and your account's address in place of example.amocrm.ru. Only you can change this setting; an agent cannot."
 }

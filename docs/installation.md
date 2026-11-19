@@ -9,7 +9,9 @@ MCP, as far as the permissions you set allow. You run the same commands yourself
 
 `amo` is a WireCat command-line tool, a program you or your agent run by its name. You connect it once per account,
 and `amo work setup` asks each question in turn. One private integration serves both ways of signing in: a token you
-paste, or a sign-in in the browser. The one prerequisite is an account administrator, who makes the integration.
+paste, or a sign-in in the browser. The one prerequisite is an account administrator, who makes the integration. Not
+an administrator yourself? Ask one for a key, as [if you are not an administrator](#if-you-are-not-an-administrator)
+shows.
 
 **On this page:**
 
@@ -18,10 +20,11 @@ paste, or a sign-in in the browser. The one prerequisite is an account administr
 3. [Sign in with a key](#sign-in-with-a-key)
 4. [Sign in through the integration](#sign-in-through-the-integration)
 5. [Which one to choose](#which-one-to-choose)
-6. [Connect step by step](#connect-step-by-step)
-7. [Connect in WireCat Desktop](#connect-in-wirecat-desktop)
-8. [Sign out and revoke access](#sign-out-and-revoke-access)
-9. [Next: the first sync](#next-the-first-sync)
+6. [If you are not an administrator](#if-you-are-not-an-administrator)
+7. [Connect step by step](#connect-step-by-step)
+8. [Connect in WireCat Desktop](#connect-in-wirecat-desktop)
+9. [Sign out and revoke access](#sign-out-and-revoke-access)
+10. [Next: the first sync](#next-the-first-sync)
 
 ## Install
 
@@ -88,7 +91,9 @@ then keeps it in the system keyring with the address. `--credential-storage file
 
 ## Sign in through the integration
 
-This sign-in uses OAuth: you allow the integration in the browser, and each person acts with their own rights.
+This sign-in uses OAuth: you allow the integration in the browser, and act with your own rights. amoCRM offers only
+the accounts where you are an administrator
+([amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
 
 1. On the integration's **«Ключи»** tab (Kommo: **Keys and scopes**), copy the integration ID. Keep the secret key
    open too.
@@ -109,21 +114,39 @@ This sign-in uses OAuth: you allow the integration in the browser, and each pers
 
 - **The key** is the simplest: one paste and no browser. It acts as the administrator who made it, and stops on its
   end date. Then you make a new one and run `session start` again.
-- **The integration sign-in** acts as the person who signs in, and has no end date to watch. amoCRM's refresh token
+- **The integration sign-in** acts as the administrator who signs in, and has no end date to watch. amoCRM's refresh token
   lasts 3 months, and `amo` gets a new one each time it renews the access token. So it keeps working while `amo` runs
   at least once in 3 months. After a longer pause, sign in again
   ([amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
+
+## If you are not an administrator
+
+You can tell by the menu on the left in amoCRM: without **амоМаркет** there, you are not an administrator. Only an
+administrator can create the integration and its key, and the browser sign-in offers only accounts where you are one. So
+you connect with a key an administrator makes for you:
+
+1. Send an administrator of your account the link to this page, and ask for a private integration and its long-lived
+   token.
+2. The administrator follows [create the integration](#create-the-integration) and [sign in with a key](#sign-in-with-a-key),
+   and passes you the key. The key works like a password: pass it through a password manager, not a group chat.
+3. Run `amo work setup`, answer **No, I am a user**, and paste the key.
+
+The key acts with the administrator's rights: you see and can change what the administrator can. amo's permissions
+still limit what an agent changes. A sync first copies the administrator's deals, so choose your own as
+[which deals sync copies](configuration.md#which-deals-sync-copies) shows.
 
 ## Connect step by step
 
 `amo work setup` asks the questions one at a time, checks the answers and saves them only when the check passes:
 
 1. **Which account?** The address you open the CRM at.
-2. **Create a private integration.** The steps of [create the integration](#create-the-integration).
-3. **Make the token.** Paste the key from the «Ключи» tab.
-4. **Checking the token.** `amo` asks the account who the token belongs to, and saves the address and the token only
+2. **Are you an administrator of this account?** An administrator goes on to create the integration. A user gets
+   the request to send an administrator, as in [if you are not an administrator](#if-you-are-not-an-administrator).
+3. **Create a private integration.** The steps of [create the integration](#create-the-integration).
+4. **Make the token.** Paste the key from the «Ключи» tab, or the key the administrator sent you.
+5. **Checking the token.** `amo` asks the account who the token belongs to, and saves the address and the token only
    if the account answers. A refused token takes you back to the token step.
-5. **Connected.** The profile is ready.
+6. **Connected.** The profile is ready. A user who is not an administrator also sees how to choose their own deals.
 
 It signs in with the key. The browser sign-in is the command shown under **Advanced** on the last step.
 

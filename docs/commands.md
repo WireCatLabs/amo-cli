@@ -71,7 +71,7 @@ keep this profile's amoCRM sign-in and account address in the OS keyring
 
 ### `amo session start`
 
-sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it. With --client-id it signs in through that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens act with the rights of the user who signs in; the integration's Redirect URI must be https://wirecat.dev/webhooks/apps/amo-callback. Each sign-in forgets the profile's other kind
+sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it. With --client-id it signs in through that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens act with the rights of the user who signs in; the integration's Redirect URI must be https://wirecat.dev/webhooks/apps/amo-callback. amoCRM lets only an account administrator allow that sign-in, so a user who is not one signs in with a token an administrator made. Each sign-in forgets the profile's other kind
 
 **Changes something on this computer only.**
 

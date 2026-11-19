@@ -21,5 +21,17 @@
   "done.title": "Conectado",
   "done.body": "El perfil está listo. Copia tus negocios y sus clientes a WireCat y luego muestra los abiertos:",
   "done.oauth.title": "Avanzado: entrar con la integración",
-  "done.oauth": "Con el ID y la clave secreta de la integración, cada persona entra en el navegador y actúa con sus propios permisos. Ejecútalo en una terminal; la clave secreta se pide oculta:"
+  "done.oauth": "En lugar de un token, un administrador puede iniciar sesión con la integración en el navegador, con su ID y su clave secreta, y amo renueva ese acceso solo. amoCRM solo deja dar acceso así a los administradores de la cuenta. Ejecuta esto en una terminal; la clave secreta se pide oculta:",
+  "role.title": "¿Eres administrador de esta cuenta?",
+  "role.intro": "Solo un administrador de la cuenta de amoCRM puede crear la integración y su token. Si no lo eres, un administrador crea el token para ti.",
+  "role.admin": "Sí, soy administrador",
+  "role.admin.hint": "Ves амоМаркет en el menú de la izquierda y puedes crear integraciones.",
+  "role.member": "No, soy usuario",
+  "role.member.hint": "No hay амоМаркет en tu menú. Un administrador te envía el token.",
+  "ask.title": "Pide el token a un administrador",
+  "ask.body": "Envía esta petición a un administrador de tu cuenta:\n\n> Crea, por favor, una integración privada WireCat en амоМаркет y envíame su token de larga duración. Cómo hacerlo: https://wirecat.dev/es/docs/amo/installation\n\nEl administrador crea la integración, pulsa **«Сгенерировать токен»** en su pestaña **«Ключи»** y te pasa el token. El token funciona como una contraseña: pásalo con un gestor de contraseñas, no en un chat de grupo.",
+  "ask.rights": "Un token de larga duración de amoCRM actúa con los permisos del administrador que lo creó. Con él ves y puedes cambiar lo mismo que ese administrador. amo sigue limitando los cambios de los agentes con sus permisos.",
+  "ask.later": "Cuando tengas el token, pasa al siguiente paso y pégalo.",
+  "token.member": "Pega el token que te envió el administrador. Si se perdió, el administrador puede crear otro en la pestaña **«Ключи»** de la misma integración.",
+  "done.own": "El token es del administrador, así que al principio la sincronización copia los negocios del administrador. Busca tu id en la lista de usuarios y ponlo en lugar de 7001, y la dirección de tu cuenta en lugar de example.amocrm.ru. Solo tú puedes cambiar este ajuste; un agente no."
 }
