@@ -98,7 +98,7 @@ const awaitRedirect = async (
   })
   void redirect.catch(() => {})
   const handler: RequestListener = (request, response) => {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1")
+    const url = new URL(request.url ?? "/", "http://localhost")
     if (request.method !== "GET" || url.pathname !== "/callback") return void response.writeHead(404).end()
     if (settled || !state || url.searchParams.get("state") !== state)
       return void response.writeHead(400).end("This sign-in link does not belong to the waiting sign-in")
@@ -277,7 +277,7 @@ export const browserSignIn = async <T extends { id: string }>(options: BrowserSi
     now: options.now,
     signal: options.signal,
   })
-  const signInCommand = `${IDENTITY.command} ${options.profile} session start --host ${origin} --browser`
+  const signInCommand = `${IDENTITY.command} ${options.profile} session start --host ${origin} --one-click`
   const provider = appProvider(origin, client)
   const fetch = fetchFor(origin, options.fetch)
   const tokens = await provider.exchange?.(

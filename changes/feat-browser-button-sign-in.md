@@ -1,6 +1,6 @@
 ### Added
 
-- **Sign in with one click: `amo <profile> session start --host https://<subdomain>.amocrm.ru --browser`.** The
+- **Sign in with one click: `amo <profile> session start --host https://<subdomain>.amocrm.ru --one-click`.** The
   browser opens amoCRM's button on wirecat.dev. The person chooses the account and clicks «Разрешить», and amoCRM
   creates a WireCat integration in it. Nobody copies an integration ID, a secret key or a token. amoCRM sends the
   integration's secret key to wirecat.dev, and `amo` collects it once. `amo` exchanges the code only with the account

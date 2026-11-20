@@ -16,7 +16,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `session start` |  | ✅ |  |
 | `session start` | `--host` | ✅ |  |
 | `session start` | `--client-id` | ✅ |  |
-| `session start` | `--browser` | ✅ |  |
+| `session start` | `--one-click` | ✅ |  |
 | `session start` | `--credential-storage` | ✅ |  |
 | `session status` |  | ✅ |  |
 | `session status` | `--check` | ✅ |  |

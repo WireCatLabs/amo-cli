@@ -49,7 +49,7 @@ One click in the browser, with nothing to copy. It works for amoCRM accounts at 
 accounts sign in with a key for now.
 
 ```sh
-amo work session start --host https://example.amocrm.ru --browser
+amo work session start --host https://example.amocrm.ru --one-click
 ```
 
 1. The browser opens a WireCat page with amoCRM's button. Click it.

@@ -5,5 +5,12 @@
     "reason": "Names the amoCRM account the long-lived token belongs to: the token carries no address, unlike b24's webhook, so the sign-in cannot find the account without it. Review when the vocabulary names an account address: https://github.com/WireCatLabs/cli-base/issues/424",
     "owner": "@WireCatLabs",
     "review_after": "2027-02-15"
+  },
+  {
+    "rule": "option-role",
+    "target": "session start --one-click",
+    "reason": "Signs in through amoCRM's button, which creates the integration itself; no vocabulary flag means that (--browser names a browser program, --button is text). Review when the vocabulary names a sign-in that makes its own integration.",
+    "owner": "@WireCatLabs",
+    "review_after": "2027-02-15"
   }
 ]

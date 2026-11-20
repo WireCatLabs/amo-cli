@@ -269,7 +269,7 @@ export const appAuthOf = (options: {
     lockDir: paths(options.env).config,
     fetch: fetchFor(origin, options.fetch),
     signInCommand: `${IDENTITY.command} ${options.profile} session start --host ${origin} ${
-      stored.browser ? "--browser" : `--client-id ${stored.client.clientId}`
+      stored.browser ? "--one-click" : `--client-id ${stored.client.clientId}`
     }`,
     ...(options.signal ? { signal: options.signal } : {}),
   })

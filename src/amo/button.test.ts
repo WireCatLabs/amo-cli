@@ -7,7 +7,7 @@ import { allowed, browser, fakeClaim, routed } from "../testing/fake-connect.js"
 import { amo } from "../testing/harness.js"
 import { appProvider, appStorage, CONNECT_PAGE_URL, RELAY_URL } from "./oauth.js"
 
-const START = ["work", "session", "start", "--host", FAKE_ORIGIN, "--browser", "--json"]
+const START = ["work", "session", "start", "--host", FAKE_ORIGIN, "--one-click", "--json"]
 
 const signIn = async ({
   claim = fakeClaim(["keys"]),
@@ -163,7 +163,7 @@ describe("signing in with amoCRM's button", () => {
 
   it("refuses Kommo before opening anything", async () => {
     const { lastError, played } = await signIn({
-      argv: ["work", "session", "start", "--host", "https://example.kommo.com", "--browser", "--json"],
+      argv: ["work", "session", "start", "--host", "https://example.kommo.com", "--one-click", "--json"],
     })
     expect(lastError()).toMatchObject({ code: "validation_error", reason: "oauth.browser-amocrm-only" })
     expect(played.opened).toEqual([])
@@ -180,7 +180,7 @@ describe("signing in with amoCRM's button", () => {
     expect(plain.played.opened).toEqual([])
   })
 
-  it("refuses --browser with --client-id", async () => {
+  it("refuses --one-click with --client-id", async () => {
     const { lastError } = await signIn({ argv: [...START, "--client-id", FAKE_CLIENT_ID] })
     expect(lastError()).toMatchObject({ code: "validation_error" })
   })

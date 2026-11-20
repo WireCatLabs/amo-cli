@@ -125,7 +125,7 @@ interface StartArgs {
   host: string
   credentialStorage: TokenStorage
   clientId?: string
-  browser?: boolean
+  oneClick?: boolean
 }
 
 /**
@@ -280,13 +280,12 @@ const startCommand = () =>
       mcp: false,
       examples: [
         `${AMO} work session start --host https://example.amocrm.ru`,
-        `${AMO} work session start --host https://example.amocrm.ru --browser`,
-        `${AMO} work session start --host https://example.kommo.com --json`,
+        `${AMO} work session start --host https://example.amocrm.ru --one-click`,
         `${AMO} work session start --host https://example.amocrm.ru --client-id 0123abcd-4567-89ef-0123-456789abcdef`,
       ],
     }),
   )
-    .summary("sign in to amoCRM or Kommo in the browser, with a long-lived token, or with your own integration")
+    .summary("sign in with one click, a long-lived token or your own integration")
     .description(
       "sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and " +
         "scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, " +
@@ -294,7 +293,7 @@ const startCommand = () =>
         "The token acts with the rights of the administrator who made it. With --client-id it signs in through " +
         "that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens " +
         `act with the rights of the user who signs in; the integration's Redirect URI must be ${RELAY_URL}. ` +
-        "With --browser, amoCRM's button on wirecat.dev creates a WireCat integration in the account you choose, and " +
+        "With --one-click, amoCRM's button on wirecat.dev creates a WireCat integration in the account you choose, and " +
         "nothing is copied by hand: amoCRM sends the integration's secret key to wirecat.dev, which hands it to amo " +
         "once and keeps no copy; amocrm.ru accounts only for now. " +
         "amoCRM lets only an account administrator allow either browser sign-in, so a user who is not one signs in " +
@@ -308,7 +307,7 @@ const startCommand = () =>
         "prompt or stdin",
     )
     .option(
-      "--browser",
+      "--one-click",
       "sign in with one click in the browser: amoCRM creates WireCat's integration in the account; only an " +
         "administrator can allow it",
     )
@@ -323,9 +322,9 @@ const startCommand = () =>
       refuseCommandName(profile, commandWords(rootOf(this)), AMO)
       refuseOffline(this, "the amoCRM account")
       const origin = accountOrigin(args.host)
-      if (args.browser) {
+      if (args.oneClick) {
         if (args.clientId !== undefined)
-          throw new CliError("validation_error", "--browser makes its own integration; leave out --client-id", {
+          throw new CliError("validation_error", "--one-click makes its own integration; leave out --client-id", {
             param: "--client-id",
           })
         return answer(this, await startWithButton(this, args, origin))
