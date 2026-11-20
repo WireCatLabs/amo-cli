@@ -1,8 +1,9 @@
-import { CliError, type KeyringStore } from "@wirecat/cli-base"
+import { CliError, type KeyringStore, monotonic, realSleep } from "@wirecat/cli-base"
 import { annotate } from "@wirecat/cli-base/commands"
 import { readSecret } from "@wirecat/cli-core"
 import {
   commandWords,
+  type EventSink,
   environmentOf,
   FETCH,
   type GlobalFlags,
@@ -23,13 +24,15 @@ import {
   rememberAccount,
   renderAnswer,
   rootOf,
+  type SignInSteps,
   secretInputOf,
   signInSteps,
   type TokenStorage,
 } from "@wirecat/cli-core/cli"
 import { Command } from "commander"
 import { accountOrigin, decodeSignIn, encodeSignIn } from "../amo/account.js"
-import { appSignIn, appSourceOf, appStorage, RELAY_URL } from "../amo/oauth.js"
+import { type BrowserSteps, browserSignIn, refuseKommo } from "../amo/button.js"
+import { type AppAuth, appSignIn, appSourceOf, appStorage, RELAY_URL } from "../amo/oauth.js"
 import { configuration } from "../config.js"
 import {
   type AmoEnvironment,
@@ -122,6 +125,98 @@ interface StartArgs {
   host: string
   credentialStorage: TokenStorage
   clientId?: string
+  browser?: boolean
+}
+
+/**
+ * How a browser sign-in reaches the person: the browser opened at a terminal or by a test, the link as an `open_url`
+ * step for Desktop and as a line for a person, and a paste when the browser cannot come back to this computer.
+ */
+const browserStepsOf = (command: Command, steps: SignInSteps, purpose: string): BrowserSteps => {
+  const { env, environment } = contextOf(command)
+  const flags = command.optsWithGlobals<GlobalFlags & { input?: boolean }>()
+  const machine = flags.json === true || flags.jsonl === true
+  const person = !machine && flags.input !== false && !env.CI && (environment.tty ?? process.stdout.isTTY) === true
+  const { streams } = outputFor(command)
+  const input = secretInputOf(command).input ?? process.stdin
+  const given = environment.answer
+  return {
+    openBrowser: async (url) => {
+      if (environment.openBrowser) return environment.openBrowser(url)
+      if (person) await openBrowser(url)
+    },
+    showUrl: (url) => {
+      steps.openUrl(url, purpose)
+      streams.diagnostic(`Open the amoCRM sign-in: ${url}\n`)
+    },
+    // A pipe was the secret, and an empty answer would end the sign-in before the browser came back.
+    ...(given
+      ? {
+          readPaste: async () => {
+            const text = await given(PASTE)
+            if (text === null) throw new CliError("cancelled", "nobody is at a terminal to paste")
+            return text
+          },
+        }
+      : input.isTTY && !machine
+        ? {
+            readPaste: (signal: AbortSignal) => readSecret(PASTE, { ...secretInputOf(command), echo: true, signal }),
+          }
+        : {}),
+  }
+}
+
+const stepsOf = (command: Command) => {
+  const { environment } = contextOf(command)
+  const flags = command.optsWithGlobals<GlobalFlags>()
+  const machine = flags.json === true || flags.jsonl === true
+  const { streams } = outputFor(command)
+  return signInSteps({
+    diagnostic: (line) => streams.diagnostic(`${line}\n`),
+    json: machine || environment.tty === false,
+    answers: false,
+  })
+}
+
+/** The account user a new integration sign-in carries, refused when another profile here already is that user. */
+const checkedUser = (command: Command, events: EventSink) => async (auth: AppAuth) => {
+  const { env, keyring, profile } = contextOf(command)
+  const found = await accountUser(transportFor(command, auth, events))
+  refuseDuplicate(env, keyring, profile, { host: found.account, userId: found.user.id })
+  return { ...found, id: found.user.id }
+}
+
+/**
+ * amoCRM's button on wirecat.dev: it creates WireCat's integration in the account, so nothing is copied by hand.
+ * The setup flow's check runs it too, with Desktop's steps.
+ */
+export const signInWithButton = async (
+  command: Command,
+  origin: string,
+  steps: SignInSteps,
+  storage: TokenStorage = "keyring",
+) => {
+  const { env, profile, tokens, keyring, run, environment } = contextOf(command)
+  refuseKommo(origin)
+  const who = await run((events) =>
+    browserSignIn({
+      env,
+      profile,
+      origin,
+      storage,
+      keyring,
+      fetch: environment.fetch as typeof fetch | undefined,
+      sleep: environment.sleep ?? realSleep,
+      now: environment.now ?? monotonic,
+      signal: environment.signal,
+      steps: browserStepsOf(command, steps, "Choose the amoCRM account and allow WireCat's integration"),
+      check: checkedUser(command, events),
+    }),
+  )
+  tokens.remove(profile)
+  rememberAccount(IDENTITY, profile, `${who.account}:${who.user.id}`, env)
+  const { id: _id, ...found } = who
+  return { found, storedIn: appSourceOf(env, profile, keyring) ?? storage }
 }
 
 /** The owner's own integration in the browser; its secret is never a flag (WC-SECR-5). */
@@ -131,17 +226,6 @@ const startWithApp = async (command: Command, args: StartArgs, origin: string) =
   const clientSecret =
     env[CLIENT_SECRET]?.trim() || (await readSecret("amoCRM integration secret key: ", secretInputOf(command))).trim()
   if (!clientSecret) throw new CliError("validation_error", "no secret key was given")
-  const flags = command.optsWithGlobals<GlobalFlags & { input?: boolean }>()
-  const machine = flags.json === true || flags.jsonl === true
-  const person = !machine && flags.input !== false && !env.CI && (environment.tty ?? process.stdout.isTTY) === true
-  const { streams } = outputFor(command)
-  const steps = signInSteps({
-    diagnostic: (line) => streams.diagnostic(`${line}\n`),
-    json: machine || environment.tty === false,
-    answers: false,
-  })
-  const input = secretInputOf(command).input ?? process.stdin
-  const given = environment.answer
   const signInCommand = `${AMO} ${profile} session start --host ${origin} --client-id ${clientId}`
   const who = await run((events) =>
     appSignIn({
@@ -154,36 +238,8 @@ const startWithApp = async (command: Command, args: StartArgs, origin: string) =
       fetch: environment.fetch as typeof fetch | undefined,
       signal: environment.signal,
       signInCommand,
-      steps: {
-        openBrowser: async (url) => {
-          if (environment.openBrowser) return environment.openBrowser(url)
-          if (person) await openBrowser(url)
-        },
-        showUrl: (url) => {
-          steps.openUrl(url, "Sign in to amoCRM and allow the integration")
-          streams.diagnostic(`Open the amoCRM sign-in: ${url}\n`)
-        },
-        // A pipe was the secret, and an empty answer would end the sign-in before the browser came back.
-        ...(given
-          ? {
-              readPaste: async () => {
-                const text = await given(PASTE)
-                if (text === null) throw new CliError("cancelled", "nobody is at a terminal to paste")
-                return text
-              },
-            }
-          : input.isTTY && !machine
-            ? {
-                readPaste: (signal: AbortSignal) =>
-                  readSecret(PASTE, { ...secretInputOf(command), echo: true, signal }),
-              }
-            : {}),
-      },
-      check: async (auth) => {
-        const found = await accountUser(transportFor(command, auth, events))
-        refuseDuplicate(env, keyring, profile, { host: found.account, userId: found.user.id })
-        return { ...found, id: found.user.id }
-      },
+      steps: browserStepsOf(command, stepsOf(command), "Sign in to amoCRM and allow the integration"),
+      check: checkedUser(command, events),
     }),
   )
   tokens.remove(profile)
@@ -200,6 +256,19 @@ const startWithApp = async (command: Command, args: StartArgs, origin: string) =
   }
 }
 
+const startWithButton = async (command: Command, args: StartArgs, origin: string) => {
+  const { found, storedIn } = await signInWithButton(command, origin, stepsOf(command), args.credentialStorage)
+  keepHost(command, origin)
+  return {
+    profile: contextOf(command).profile,
+    state: "saved",
+    kind: "app",
+    stored_in: storedIn,
+    verified: true,
+    ...found,
+  }
+}
+
 const CLIENT_ID = `${IDENTITY.envPrefix}_AMOCRM_CLIENT_ID`
 const CLIENT_SECRET = `${IDENTITY.envPrefix}_AMOCRM_CLIENT_SECRET`
 
@@ -211,12 +280,13 @@ const startCommand = () =>
       mcp: false,
       examples: [
         `${AMO} work session start --host https://example.amocrm.ru`,
+        `${AMO} work session start --host https://example.amocrm.ru --browser`,
         `${AMO} work session start --host https://example.kommo.com --json`,
         `${AMO} work session start --host https://example.amocrm.ru --client-id 0123abcd-4567-89ef-0123-456789abcdef`,
       ],
     }),
   )
-    .summary("sign in to amoCRM or Kommo with a long-lived token or your own integration")
+    .summary("sign in to amoCRM or Kommo in the browser, with a long-lived token, or with your own integration")
     .description(
       "sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and " +
         "scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, " +
@@ -224,8 +294,11 @@ const startCommand = () =>
         "The token acts with the rights of the administrator who made it. With --client-id it signs in through " +
         "that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens " +
         `act with the rights of the user who signs in; the integration's Redirect URI must be ${RELAY_URL}. ` +
-        "amoCRM lets only an account administrator allow that sign-in, so a user who is not one signs in with a " +
-        "token an administrator made. " +
+        "With --browser, amoCRM's button on wirecat.dev creates a WireCat integration in the account you choose, and " +
+        "nothing is copied by hand: amoCRM sends the integration's secret key to wirecat.dev, which hands it to amo " +
+        "once and keeps no copy; amocrm.ru accounts only for now. " +
+        "amoCRM lets only an account administrator allow either browser sign-in, so a user who is not one signs in " +
+        "with a token an administrator made. " +
         "Each sign-in forgets the profile's other kind",
     )
     .requiredOption("--host <address>", "the account's address, such as https://example.amocrm.ru, kept as given")
@@ -233,6 +306,11 @@ const startCommand = () =>
       "--client-id <id>",
       `the integration's ID (client_id), or ${CLIENT_ID}; its secret key comes from ${CLIENT_SECRET}, a hidden ` +
         "prompt or stdin",
+    )
+    .option(
+      "--browser",
+      "sign in with one click in the browser: amoCRM creates WireCat's integration in the account; only an " +
+        "administrator can allow it",
     )
     .option(
       "--credential-storage <storage>",
@@ -245,6 +323,13 @@ const startCommand = () =>
       refuseCommandName(profile, commandWords(rootOf(this)), AMO)
       refuseOffline(this, "the amoCRM account")
       const origin = accountOrigin(args.host)
+      if (args.browser) {
+        if (args.clientId !== undefined)
+          throw new CliError("validation_error", "--browser makes its own integration; leave out --client-id", {
+            param: "--client-id",
+          })
+        return answer(this, await startWithButton(this, args, origin))
+      }
       if (args.clientId !== undefined || env[CLIENT_ID]) return answer(this, await startWithApp(this, args, origin))
       // A secret is never an argument: it would land in shell history and in the run record (WC-SECR-5).
       const token = (await readSecret("amoCRM long-lived token: ", secretInputOf(this))).trim()

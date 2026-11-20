@@ -6,9 +6,11 @@ import { ProfileTokenStore, setupProblems } from "@wirecat/cli-core/cli"
 import { setupFileProblems } from "@wirecat/cli-core/testing"
 import { describe, expect, it } from "vitest"
 import { encodeSignIn } from "../amo/account.js"
+import { CONNECT_PAGE_URL } from "../amo/oauth.js"
 import { configuration } from "../config.js"
 import { IDENTITY } from "../identity.js"
-import { FAKE_HOST, FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID } from "../testing/fake-amo.js"
+import { FAKE_CLIENT_SECRET, FAKE_HOST, FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, fakeAmo } from "../testing/fake-amo.js"
+import { allowed, fakeClaim, routed } from "../testing/fake-connect.js"
 import { amo, FAKE_SIGN_IN } from "../testing/harness.js"
 import { amoSetup } from "./flow.js"
 import en from "./texts.en.json" with { type: "json" }
@@ -162,5 +164,31 @@ describe("the setup flow", () => {
     const { code, err } = await apply({ host: FAKE_ORIGIN }, memoryKeyring({ "amo-cli:token:work": FAKE_SIGN_IN }))
     expect(err).not.toContain("validation_error")
     expect(code).toBe(0)
+  })
+
+  it("**an administrator signs in with amoCRM's button**: Desktop gets the link, and no token is asked", async () => {
+    const env = { AMO_CONFIG_DIR: configs() }
+    const keyring = memoryKeyring()
+    const dry = await amo(["work", "setup", "apply", "--dry-run", "--json"], {
+      keyring,
+      env,
+      stdin: JSON.stringify({ host: FAKE_ORIGIN, role: "admin", method: "browser" }),
+    })
+    expect(dry.json()).toMatchObject({ item: { path: ["account", "role", "method", "connect"], complete: true } })
+    const account = fakeAmo({ perSecond: 10_000 })
+    const played = allowed()
+    const ran = await amo(["work", "setup", "run", "apply", "--json", "--answer-stdin"], {
+      account: { fetch: routed(fakeClaim(["keys"]), account) },
+      keyring,
+      env,
+      openBrowser: played.openBrowser,
+      stdin: `${JSON.stringify({ host: FAKE_ORIGIN, role: "admin", method: "browser" })}\n`,
+    })
+    expect(ran.code).toBe(0)
+    expect(ran.err).toContain(`"event":"open_url","url":"${CONNECT_PAGE_URL}#state=`)
+    expect(ran.json()).toMatchObject({ item: { outcome: "ok", saved: ["host"], secrets: [] } })
+    expect(ran.out + ran.err).not.toContain(FAKE_CLIENT_SECRET)
+    const status = await amo(["work", "session", "status", "--check", "--json"], { account, keyring, env })
+    expect(status.json()).toMatchObject({ item: { kind: "app", account: FAKE_HOST, verified: true } })
   })
 })

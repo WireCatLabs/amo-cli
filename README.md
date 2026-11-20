@@ -77,23 +77,23 @@ and write notes by itself. In `amo` that takes `api call`, which you run yoursel
 ```sh
 npm install -g @wirecat/amo-cli
 amo skill install            # the agent skill, for Claude Code, Codex, Gemini CLI and OpenClaw
-amo work setup               # make a private integration in amoCRM or Kommo, paste its token
+amo work setup               # sign in with amoCRM in the browser, or paste a token
 amo work sync                # copy your deals and their clients
 amo work deals list status:open
 ```
 
 `work` is a profile, a name you choose for one account. It is the first word of every command that uses the account,
-and none is ever assumed. `amo work setup` shows each click in amoCRM or Kommo, asks for the account's address and the
-integration's long-lived token, checks them against the account and keeps the token in the system keyring. An account
-administrator makes the integration once. A sync copies the deals assigned to the user the token belongs to. To copy
-a colleague's too, see
+and none is ever assumed. `amo work setup` asks for the account's address. An administrator of an amoCRM account then
+clicks **Sign in with amoCRM** and allows access in the browser. Otherwise it shows each click to make a private
+integration and its long-lived token, checks them against the account and keeps the token in the system keyring. A
+sync copies the deals assigned to the user the token belongs to. To copy a colleague's too, see
 [which deals sync copies](https://github.com/WireCatLabs/amo-cli/blob/main/docs/configuration.md#which-deals-sync-copies).
 
 You need Node.js 22.16 or a later 22.x, or Node.js 24 or later. `amo doctor` needs no network and shows what is set
 up.
 
-More: [install and connect](https://github.com/WireCatLabs/amo-cli/blob/main/docs/installation.md), with the browser
-sign-in through the integration.
+More: [install and connect](https://github.com/WireCatLabs/amo-cli/blob/main/docs/installation.md), with every way
+to sign in.
 
 ## Use it with your agent
 
@@ -179,9 +179,10 @@ More: [WireCat](https://wirecat.dev)
 
 ## How it works
 
-- **Two ways to sign in.** A long-lived token acts with the rights of the administrator who made it. A sign-in through
-  the integration in the browser acts with the rights of the person who signs in, and `amo` renews it itself. Either is
-  kept in your system keyring.
+- **Sign in with one click, or with a token.** An amoCRM administrator clicks amoCRM's button in the browser and
+  copies nothing: amoCRM creates WireCat's integration, `amo` acts with that person's rights and renews the sign-in
+  itself. A long-lived token works for Kommo and for users, with the rights of the administrator who made it. Either
+  is kept in your system keyring.
 - **A copy of your share of the CRM.** `sync` copies the pipelines, the deals assigned to you and only the contacts and
   companies on them. An administrator can choose colleagues too. No sync copies the whole CRM.
 - **Staying current.** `amo work schedule command crm --every 1h -- sync` keeps the copy fresh with a timer.

@@ -33,5 +33,14 @@
   "ask.rights": "Un token de larga duración de amoCRM actúa con los permisos del administrador que lo creó. Con él ves y puedes cambiar lo mismo que ese administrador. amo sigue limitando los cambios de los agentes con sus permisos.",
   "ask.later": "Cuando tengas el token, pasa al siguiente paso y pégalo.",
   "token.member": "Pega el token que te envió el administrador. Si se perdió, el administrador puede crear otro en la pestaña **«Ключи»** de la misma integración.",
-  "done.own": "El token es del administrador, así que al principio la sincronización copia los negocios del administrador. Busca tu id en la lista de usuarios y ponlo en lugar de 7001, y la dirección de tu cuenta en lugar de example.amocrm.ru. Solo tú puedes cambiar este ajuste; un agente no."
+  "done.own": "El token es del administrador, así que al principio la sincronización copia los negocios del administrador. Busca tu id en la lista de usuarios y ponlo en lugar de 7001, y la dirección de tu cuenta en lugar de example.amocrm.ru. Solo tú puedes cambiar este ajuste; un agente no.",
+  "method.title": "¿Cómo quieres entrar?",
+  "method.intro": "Entrar con amoCRM es un clic en el navegador, sin copiar nada a mano. Funciona con cuentas en amocrm.ru; para Kommo, usa un token.",
+  "method.browser": "Entrar con amoCRM",
+  "method.browser.hint": "amoCRM crea una integración de WireCat en la cuenta, y amo renueva el acceso por sí mismo.",
+  "method.token": "Con un token de larga duración",
+  "method.token.hint": "Creas una integración privada y pegas aquí su token.",
+  "connect.title": "Permite el acceso en amoCRM",
+  "connect.body": "Abre el enlace de abajo. En wirecat.dev, pulsa el botón de amoCRM, elige la cuenta y pulsa **«Разрешить»**. amoCRM crea en ella la integración de WireCat y envía su clave secreta a wirecat.dev, que se la pasa a amo una vez y no guarda copia. amo guarda el acceso solo si la cuenta responde.",
+  "connect.admin": "amoCRM solo deja hacerlo a un administrador de la cuenta. La integración aparece luego en амоМаркет, donde un administrador puede desactivarla."
 }

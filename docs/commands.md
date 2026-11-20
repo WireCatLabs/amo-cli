@@ -71,7 +71,7 @@ keep this profile's amoCRM sign-in and account address in the OS keyring
 
 ### `amo session start`
 
-sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it. With --client-id it signs in through that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens act with the rights of the user who signs in; the integration's Redirect URI must be https://wirecat.dev/webhooks/apps/amo-callback. amoCRM lets only an account administrator allow that sign-in, so a user who is not one signs in with a token an administrator made. Each sign-in forgets the profile's other kind
+sign this profile in: --host names the account, and its long-lived token (a private integration → Keys and scopes → Generate a long-lived token) is asked hidden or read from stdin, never taken as an argument, checked against the account, and only then kept in the keyring with the address, or in a private file. The token acts with the rights of the administrator who made it. With --client-id it signs in through that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens act with the rights of the user who signs in; the integration's Redirect URI must be https://wirecat.dev/webhooks/apps/amo-callback. With --browser, amoCRM's button on wirecat.dev creates a WireCat integration in the account you choose, and nothing is copied by hand: amoCRM sends the integration's secret key to wirecat.dev, which hands it to amo once and keeps no copy; amocrm.ru accounts only for now. amoCRM lets only an account administrator allow either browser sign-in, so a user who is not one signs in with a token an administrator made. Each sign-in forgets the profile's other kind
 
 **Changes something on this computer only.**
 
@@ -83,9 +83,10 @@ amo session start [options]
 |---|---|
 | `--host <address>` | the account's address, such as https://example.amocrm.ru, kept as given. |
 | `--client-id <id>` | the integration's ID (client_id), or AMO_AMOCRM_CLIENT_ID; its secret key comes from AMO_AMOCRM_CLIENT_SECRET, a hidden prompt or stdin. |
+| `--browser` | sign in with one click in the browser: amoCRM creates WireCat's integration in the account; only an administrator can allow it. |
 | `--credential-storage <storage>` | where the sign-in is kept: keyring, which falls back to a private file by itself, or file. Default: `keyring`. |
 
-**Example:** `amo work session start --host https://example.amocrm.ru`, `amo work session start --host https://example.kommo.com --json`, `amo work session start --host https://example.amocrm.ru --client-id 0123abcd-4567-89ef-0123-456789abcdef`
+**Example:** `amo work session start --host https://example.amocrm.ru`, `amo work session start --host https://example.amocrm.ru --browser`, `amo work session start --host https://example.kommo.com --json`, `amo work session start --host https://example.amocrm.ru --client-id 0123abcd-4567-89ef-0123-456789abcdef`
 
 ### `amo session status`
 
