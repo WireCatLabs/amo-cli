@@ -9,7 +9,7 @@ import {
 } from "@wirecat/cli-core/cli"
 import { accountOrigin } from "../amo/account.js"
 import { appStorage } from "../amo/oauth.js"
-import { checkedToken } from "../commands/session.js"
+import { checkedToken, signInWithButton } from "../commands/session.js"
 import { configuration } from "../config.js"
 import { contextOf, storedSignIn, withAccount } from "../context.js"
 import { IDENTITY } from "../identity.js"
@@ -22,11 +22,15 @@ import ru from "./texts.ru.json" with { type: "json" }
  * The same proof `session start` runs, and the same sign-in it keeps: the address and the token's user beside the
  * token. Editing a profile without a new token keeps the old one only for the same account.
  */
-const check: SetupCheck = async ({ command, settings, secrets }) => {
+const check: SetupCheck = async ({ command, settings, secrets, answers, steps }) => {
   // The guards `session start` runs before it signs in.
   refuseCommandName(contextOf(command).profile, commandWords(rootOf(command)), IDENTITY.command)
   refuseOffline(command, "the amoCRM account")
   const origin = accountOrigin(String(settings.configured.host ?? ""))
+  if (answers.method === "browser") {
+    const { found } = await signInWithButton(command, origin, steps)
+    return { ...found, keep: { account: `${found.account}:${found.user.id}` } }
+  }
   const typed = secrets.token?.trim()
   if (typed) {
     const { who, signIn, account } = await checkedToken(command, origin, typed)
@@ -48,6 +52,7 @@ const check: SetupCheck = async ({ command, settings, secrets }) => {
 }
 
 const MEMBER = { field: "role", is: "member" } as const
+const BROWSER = { field: "method", is: "browser" } as const
 const OWN_DEALS = "amo <profile> users list\namo <profile> config set crm.amocrm:example.amocrm.ru.unassigned 7001"
 const OAUTH_COMMAND = "amo <profile> session start --host https://<subdomain>.amocrm.ru --client-id <integration ID>"
 
@@ -87,7 +92,41 @@ export const amoSetup = defineSetup({
           ],
         },
       ],
-      next: [{ when: MEMBER, to: "ask-admin" }, { to: "integration" }],
+      next: [{ when: MEMBER, to: "ask-admin" }, { to: "method" }],
+    },
+    method: {
+      title: "method.title",
+      blocks: [
+        { type: "text", text: "method.intro" },
+        {
+          type: "choice",
+          id: "method",
+          optional: true,
+          options: [
+            { value: "browser", label: "method.browser", hint: "method.browser.hint" },
+            { value: "token", label: "method.token", hint: "method.token.hint" },
+          ],
+        },
+      ],
+      next: [{ when: BROWSER, to: "connect" }, { to: "integration" }],
+    },
+    connect: {
+      kind: "run",
+      title: "connect.title",
+      action: "apply",
+      blocks: [
+        { type: "text", text: "connect.body" },
+        { type: "note", role: "warning", text: "connect.admin" },
+      ],
+      next: [
+        { when: { result: "connect", is: "ok" }, to: "done" },
+        { when: { result: "connect", error: "conflict" }, to: "account" },
+        { when: { result: "connect", error: "authentication_error" }, to: "method" },
+        { when: { result: "connect", error: "validation_error" }, to: "method" },
+        { when: { result: "connect", error: "timeout" }, to: "method" },
+        { to: "failed" },
+      ],
+      back: false,
     },
     "ask-admin": {
       title: "ask.title",
@@ -152,7 +191,7 @@ export const amoSetup = defineSetup({
         { type: "code", code: "amo <profile> sync\namo <profile> deals list status:open", copy: true },
         {
           type: "group",
-          when: { not: MEMBER },
+          when: { all: [{ not: MEMBER }, { not: BROWSER }] },
           role: "details",
           title: "done.oauth.title",
           blocks: [

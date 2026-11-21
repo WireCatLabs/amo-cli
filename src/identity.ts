@@ -25,7 +25,7 @@ export const DESKTOP: ManifestIdentity = {
   ...IDENTITY,
   docs: "https://github.com/WireCatLabs/amo-cli#readme",
   // Each account lives on its own host under one of these (src/amo/account.ts); amo reaches only the one signed in.
-  hosts: ["*.amocrm.ru", "*.amocrm.com", "*.kommo.com", "wirecat.dev"],
+  hosts: ["*.amocrm.ru", "*.amocrm.com", "*.kommo.com", "wirecat.dev", "connect.wirecat.dev"],
   userHosts: "the amoCRM or Kommo account you sign in to, such as example.amocrm.ru",
   tagline: "amoCRM and Kommo CRM: deals, contacts and companies",
   syncs: "your deals, contacts and companies",

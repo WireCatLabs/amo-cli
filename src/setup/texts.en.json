@@ -33,5 +33,14 @@
   "ask.rights": "An amoCRM long-lived token acts with the rights of the administrator who made it. With it you see and can change what that administrator can. amo still stops agents' changes with its permissions.",
   "ask.later": "When you have the token, go on to the next step and paste it.",
   "token.member": "Paste the token the administrator sent you. If it is lost, the administrator can make a new one on the **«Ключи»** tab of the same integration.",
-  "done.own": "The token is the administrator's, so a sync copies the administrator's deals at first. Find your own id in the list of users and put it in place of 7001, and your account's address in place of example.amocrm.ru. Only you can change this setting; an agent cannot."
+  "done.own": "The token is the administrator's, so a sync copies the administrator's deals at first. Find your own id in the list of users and put it in place of 7001, and your account's address in place of example.amocrm.ru. Only you can change this setting; an agent cannot.",
+  "method.title": "How do you want to sign in?",
+  "method.intro": "Signing in with amoCRM takes one click in the browser and copies nothing by hand. It works for accounts at amocrm.ru; for Kommo, use a token.",
+  "method.browser": "Sign in with amoCRM",
+  "method.browser.hint": "amoCRM creates a WireCat integration in the account, and amo renews the sign-in itself.",
+  "method.token": "With a long-lived token",
+  "method.token.hint": "You create a private integration and paste its token here.",
+  "connect.title": "Allow access in amoCRM",
+  "connect.body": "Open the link below. On connect.wirecat.dev, click amoCRM's button, choose the account and click **«Разрешить»**. amoCRM creates the WireCat integration in it and sends the integration's secret key to connect.wirecat.dev, which passes it to amo once and keeps no copy. amo saves the sign-in only after the account answers.",
+  "connect.admin": "amoCRM lets only an account administrator allow this. The integration then shows in амоМаркет, where an administrator can switch it off."
 }
