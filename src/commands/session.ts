@@ -187,7 +187,8 @@ const checkedUser = (command: Command, events: EventSink) => async (auth: AppAut
 }
 
 /**
- * amoCRM's button on wirecat.dev: it creates WireCat's integration in the account, so nothing is copied by hand.
+ * amoCRM's button on connect.wirecat.dev: it creates WireCat's integration in the account, so nothing is copied by
+ * hand.
  * The setup flow's check runs it too, with Desktop's steps.
  */
 export const signInWithButton = async (
@@ -293,9 +294,9 @@ const startCommand = () =>
         "The token acts with the rights of the administrator who made it. With --client-id it signs in through " +
         "that integration in the browser instead: its secret key is asked hidden or read from stdin, and the tokens " +
         `act with the rights of the user who signs in; the integration's Redirect URI must be ${RELAY_URL}. ` +
-        "With --one-click, amoCRM's button on wirecat.dev creates a WireCat integration in the account you choose, and " +
-        "nothing is copied by hand: amoCRM sends the integration's secret key to wirecat.dev, which hands it to amo " +
-        "once and keeps no copy; amocrm.ru accounts only for now. " +
+        "With --one-click, amoCRM's button on connect.wirecat.dev creates a WireCat integration in the account you " +
+        "choose, and nothing is copied by hand: amoCRM sends the integration's secret key to connect.wirecat.dev, " +
+        "which hands it to amo once and keeps no copy; amocrm.ru accounts only for now. " +
         "amoCRM lets only an account administrator allow either browser sign-in, so a user who is not one signs in " +
         "with a token an administrator made. " +
         "Each sign-in forgets the profile's other kind",

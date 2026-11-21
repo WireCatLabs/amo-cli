@@ -5,14 +5,14 @@ import { describe, expect, it } from "vitest"
 import { FAKE_CLIENT_ID, FAKE_CLIENT_SECRET, FAKE_CODE, FAKE_HOST, FAKE_ORIGIN, fakeAmo } from "../testing/fake-amo.js"
 import { allowed, browser, fakeClaim, routed } from "../testing/fake-connect.js"
 import { amo } from "../testing/harness.js"
-import { appProvider, appStorage, CONNECT_PAGE_URL, RELAY_URL } from "./oauth.js"
+import { appProvider, appStorage, BUTTON_RELAY_URL, CLAIM_URL, CONNECT_PAGE_URL, RELAY_URL } from "./oauth.js"
 
 const START = ["work", "session", "start", "--host", FAKE_ORIGIN, "--one-click", "--json"]
 
 const signIn = async ({
   claim = fakeClaim(["keys"]),
   played = allowed(),
-  account = fakeAmo({ perSecond: 10_000 }),
+  account = fakeAmo({ perSecond: 10_000, redirectUri: BUTTON_RELAY_URL }),
   keyring = memoryKeyring(),
   argv = START,
   env,
@@ -64,7 +64,7 @@ describe("signing in with amoCRM's button", () => {
       client_id: FAKE_CLIENT_ID,
       grant_type: "authorization_code",
       code: FAKE_CODE,
-      redirect_uri: RELAY_URL,
+      redirect_uri: BUTTON_RELAY_URL,
     })
     noSecrets(ran.out + ran.err)
     noSecrets(
@@ -77,7 +77,7 @@ describe("signing in with amoCRM's button", () => {
     expect(stored).toMatchObject({
       client: { clientId: FAKE_CLIENT_ID, clientSecret: FAKE_CLIENT_SECRET },
       account: { host: FAKE_ORIGIN },
-      redirectUri: RELAY_URL,
+      redirectUri: BUTTON_RELAY_URL,
       browser: true,
     })
     // The refresh a normal run makes, with what was kept: the same request as for a --client-id sign-in.
@@ -178,6 +178,15 @@ describe("signing in with amoCRM's button", () => {
     const plain = await signIn({ env: { AMO_CONNECT_URL: "http://connect.example.test" } })
     expect(plain.lastError()).toMatchObject({ code: "configuration_error", reason: "connect.url-invalid" })
     expect(plain.played.opened).toEqual([])
+  })
+
+  it("keeps the page, the claim and the Redirect URI on connect.wirecat.dev, which amoCRM's servers can reach", () => {
+    // The Redirect URI must equal the connect page's data-redirect_uri (cli-docs services/amo-connect).
+    expect([CONNECT_PAGE_URL, CLAIM_URL, BUTTON_RELAY_URL]).toEqual([
+      "https://connect.wirecat.dev/connect/amo.html",
+      "https://connect.wirecat.dev/api/amo/claim",
+      "https://connect.wirecat.dev/webhooks/apps/amo-callback",
+    ])
   })
 
   it("refuses --one-click with --client-id", async () => {

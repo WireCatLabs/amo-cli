@@ -9,11 +9,11 @@ import {
   type AppAuth,
   appProvider,
   appStorage,
+  BUTTON_RELAY_URL,
   CLAIM_URL,
   CONNECT_PAGE_URL,
   fetchFor,
   lockDirOf,
-  RELAY_URL,
 } from "./oauth.js"
 
 export const CONNECT_VARIABLE = `${IDENTITY.envPrefix}_CONNECT_URL`
@@ -38,7 +38,7 @@ export const connectUrls = (env: NodeJS.ProcessEnv): { page: string; claim: stri
   if (url?.protocol !== "https:" || url.username || url.password)
     throw new CliError(
       "configuration_error",
-      `${CONNECT_VARIABLE} must be an https address, such as https://wirecat.dev`,
+      `${CONNECT_VARIABLE} must be an https address, such as https://connect.wirecat.dev`,
       {
         reason: "connect.url-invalid",
       },
@@ -278,7 +278,7 @@ export const browserSignIn = async <T extends { id: string }>(options: BrowserSi
     signal: options.signal,
   })
   const signInCommand = `${IDENTITY.command} ${options.profile} session start --host ${origin} --one-click`
-  const provider = appProvider(origin, client)
+  const provider = appProvider(origin, client, BUTTON_RELAY_URL)
   const fetch = fetchFor(origin, options.fetch)
   const tokens = await provider.exchange?.(
     { grant_type: "authorization_code", code: query.get("code") ?? "" },
@@ -292,7 +292,7 @@ export const browserSignIn = async <T extends { id: string }>(options: BrowserSi
   await tokenKeeper({ provider, storage, lockDir: lockDirOf(options.env), fetch, signInCommand }).save(tokens, {
     host: origin,
     userId: user.id,
-    redirectUri: RELAY_URL,
+    redirectUri: BUTTON_RELAY_URL,
     browser: true,
   })
   return user

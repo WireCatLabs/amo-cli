@@ -6,7 +6,7 @@ import { ProfileTokenStore, setupProblems } from "@wirecat/cli-core/cli"
 import { setupFileProblems } from "@wirecat/cli-core/testing"
 import { describe, expect, it } from "vitest"
 import { encodeSignIn } from "../amo/account.js"
-import { CONNECT_PAGE_URL } from "../amo/oauth.js"
+import { BUTTON_RELAY_URL, CONNECT_PAGE_URL } from "../amo/oauth.js"
 import { configuration } from "../config.js"
 import { IDENTITY } from "../identity.js"
 import { FAKE_CLIENT_SECRET, FAKE_HOST, FAKE_ORIGIN, FAKE_TOKEN, FAKE_USER_ID, fakeAmo } from "../testing/fake-amo.js"
@@ -175,7 +175,7 @@ describe("the setup flow", () => {
       stdin: JSON.stringify({ host: FAKE_ORIGIN, role: "admin", method: "browser" }),
     })
     expect(dry.json()).toMatchObject({ item: { path: ["account", "role", "method", "connect"], complete: true } })
-    const account = fakeAmo({ perSecond: 10_000 })
+    const account = fakeAmo({ perSecond: 10_000, redirectUri: BUTTON_RELAY_URL })
     const played = allowed()
     const ran = await amo(["work", "setup", "run", "apply", "--json", "--answer-stdin"], {
       account: { fetch: routed(fakeClaim(["keys"]), account) },

@@ -41,6 +41,6 @@
   "method.token": "Con un token de larga duración",
   "method.token.hint": "Creas una integración privada y pegas aquí su token.",
   "connect.title": "Permite el acceso en amoCRM",
-  "connect.body": "Abre el enlace de abajo. En wirecat.dev, pulsa el botón de amoCRM, elige la cuenta y pulsa **«Разрешить»**. amoCRM crea en ella la integración de WireCat y envía su clave secreta a wirecat.dev, que se la pasa a amo una vez y no guarda copia. amo guarda el acceso solo si la cuenta responde.",
+  "connect.body": "Abre el enlace de abajo. En connect.wirecat.dev, pulsa el botón de amoCRM, elige la cuenta y pulsa **«Разрешить»**. amoCRM crea en ella la integración de WireCat y envía su clave secreta a connect.wirecat.dev, que se la pasa a amo una vez y no guarda copia. amo guarda el acceso solo si la cuenta responde.",
   "connect.admin": "amoCRM solo deja hacerlo a un administrador de la cuenta. La integración aparece luego en амоМаркет, donde un administrador puede desactivarla."
 }

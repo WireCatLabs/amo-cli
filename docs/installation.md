@@ -62,8 +62,8 @@ What happens behind the click:
 - amoCRM lets only an account administrator allow this
   ([amoCRM: the button](https://www.amocrm.ru/developers/content/oauth/button)). The integration then shows in
   амоМаркет, where an administrator can switch it off.
-- amoCRM sends the new integration's secret key to wirecat.dev. `amo` collects it from there once, and wirecat.dev
-  keeps no copy.
+- amoCRM sends the new integration's secret key to connect.wirecat.dev, a WireCat server in Russia that amoCRM's
+  servers can reach. `amo` collects the key from there once, and the server keeps no copy.
 - `amo` exchanges the code only with the account you named in `--host`. If you chose another account in amoCRM's
   window, it stops and names that account.
 - You act with your own rights, and `amo` renews the sign-in itself, as with

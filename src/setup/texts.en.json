@@ -41,6 +41,6 @@
   "method.token": "With a long-lived token",
   "method.token.hint": "You create a private integration and paste its token here.",
   "connect.title": "Allow access in amoCRM",
-  "connect.body": "Open the link below. On wirecat.dev, click amoCRM's button, choose the account and click **«Разрешить»**. amoCRM creates the WireCat integration in it and sends the integration's secret key to wirecat.dev, which passes it to amo once and keeps no copy. amo saves the sign-in only after the account answers.",
+  "connect.body": "Open the link below. On connect.wirecat.dev, click amoCRM's button, choose the account and click **«Разрешить»**. amoCRM creates the WireCat integration in it and sends the integration's secret key to connect.wirecat.dev, which passes it to amo once and keeps no copy. amo saves the sign-in only after the account answers.",
   "connect.admin": "amoCRM lets only an account administrator allow this. The integration then shows in амоМаркет, where an administrator can switch it off."
 }

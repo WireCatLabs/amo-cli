@@ -27,18 +27,22 @@ import { isRecord } from "./json.js"
 
 export const PROVIDER = "amocrm"
 /**
- * The integration's Redirect URI, which amoCRM sends the browser to with `code` and `state` (amocrm.ru developers
- * oauth/step-by-step). The static page forwards any `code` and `state` to the waiting local port (cli-docs
- * public/webhooks/apps/amo-callback.html).
+ * The Redirect URI of an integration the owner creates for `--client-id`, which amoCRM sends the browser to with
+ * `code` and `state` (amocrm.ru developers oauth/step-by-step). The static page forwards any `code` and `state` to the
+ * waiting local port (cli-docs public/webhooks/apps/amo-callback.html).
  */
 export const RELAY_URL = "https://wirecat.dev/webhooks/apps/amo-callback"
-/** The page with amoCRM's button, which reads `state` from the fragment (cli-docs public/connect/amo.html). */
-export const CONNECT_PAGE_URL = "https://wirecat.dev/connect/amo.html"
 /**
- * Hands over once the keys amoCRM posted for a `state`. Its host may move off Cloudflare, which is blocked in Russia;
- * this is the one place to change it.
+ * The one-click sign-in runs on connect.wirecat.dev, a server in Russia (cli-docs services/amo-connect): amoCRM's
+ * servers post the new integration's keys from Russia, where Cloudflare, which serves wirecat.dev, is blocked.
  */
-export const CLAIM_URL = "https://wirecat.dev/api/amo/claim"
+const CONNECT_ORIGIN = "https://connect.wirecat.dev"
+/** The Redirect URI amoCRM's button gives the integration it creates; the same page as RELAY_URL, on that server. */
+export const BUTTON_RELAY_URL = `${CONNECT_ORIGIN}/webhooks/apps/amo-callback`
+/** The page with amoCRM's button, which reads `state` from the fragment (cli-docs services/amo-connect). */
+export const CONNECT_PAGE_URL = `${CONNECT_ORIGIN}/connect/amo.html`
+/** Hands over once the keys amoCRM posted for a `state`. */
+export const CLAIM_URL = `${CONNECT_ORIGIN}/api/amo/claim`
 const REQUEST_MS = 30_000
 const HINT = /^[\w .,:'`-]{1,200}$/
 
