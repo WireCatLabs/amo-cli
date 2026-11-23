@@ -14,6 +14,10 @@ Gemini CLI and OpenClaw look; `--for hermes` adds Hermes Agent too.
    which asks for the token hidden, checks it against the account and keeps it with the address. `work` is the
    profile, a name the owner picks for this account. Then `amo work session status --check --json` says which account
    and user the token acts as. `amo session list` lists the profiles on this computer.
+   - With `--one-click` an administrator of an amoCRM account (`*.amocrm.ru`, not Kommo) signs in with one click
+     instead: amoCRM's button on connect.wirecat.dev creates a WireCat integration in the account, its secret key
+     passes through connect.wirecat.dev once, and `amo` renews the sign-in. Only the owner clicks «Разрешить» in the
+     browser; an agent never runs it unasked.
    - With `--client-id <integration id>` the owner signs in through the integration in the browser instead, and acts
      with their own rights. `amo` renews those tokens. amoCRM offers only accounts where the person is an
      administrator, so this way is for administrators.

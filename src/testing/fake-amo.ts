@@ -61,6 +61,8 @@ export interface FakeAmoOptions {
   failWith?: number
   /** The account's `currency` (account-info); RUB when absent. */
   currency?: string
+  /** The integration's Redirect URI, which every token request must repeat (oauth/step-by-step); RELAY_URL when absent. */
+  redirectUri?: string
   /** Seconds an OAuth access token lives; amoCRM's 86400 (oauth/oauth). */
   tokenLifetime?: number
   /** Answers a test adds for operations the fake has none for, by name: `{ "GET /api/v4/tasks": () => …}`. */
@@ -804,7 +806,7 @@ const tokenEndpoint = (options: FakeAmoOptions, tokens: { access: Set<string>; r
     if (unknown.length) return invalid(unknown, "the token request takes no such field")
     if (body.client_id !== FAKE_CLIENT_ID) return refused("Check the `client_id` parameter")
     if (body.client_secret !== FAKE_CLIENT_SECRET) return refused("Check the `client_secret` parameter")
-    if (body.redirect_uri !== RELAY_URL) return refused("Check the `redirect_uri` parameter")
+    if (body.redirect_uri !== (options.redirectUri ?? RELAY_URL)) return refused("Check the `redirect_uri` parameter")
     const code = body.grant_type === "authorization_code" ? body.code === FAKE_CODE : undefined
     const refresh = body.grant_type === "refresh_token" ? body.refresh_token === tokens.refresh : undefined
     if (code === false) return refused("Cannot decrypt the authorization code")

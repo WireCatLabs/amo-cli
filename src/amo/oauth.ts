@@ -27,11 +27,22 @@ import { isRecord } from "./json.js"
 
 export const PROVIDER = "amocrm"
 /**
- * The integration's Redirect URI, which amoCRM sends the browser to with `code` and `state` (amocrm.ru developers
- * oauth/step-by-step). The static page forwards any `code` and `state` to the waiting local port (cli-docs
- * public/webhooks/apps/amo-callback.html).
+ * The Redirect URI of an integration the owner creates for `--client-id`, which amoCRM sends the browser to with
+ * `code` and `state` (amocrm.ru developers oauth/step-by-step). The static page forwards any `code` and `state` to the
+ * waiting local port (cli-docs public/webhooks/apps/amo-callback.html).
  */
 export const RELAY_URL = "https://wirecat.dev/webhooks/apps/amo-callback"
+/**
+ * The one-click sign-in runs on connect.wirecat.dev, a server in Russia (cli-docs services/amo-connect): amoCRM's
+ * servers post the new integration's keys from Russia, where Cloudflare, which serves wirecat.dev, is blocked.
+ */
+const CONNECT_ORIGIN = "https://connect.wirecat.dev"
+/** The Redirect URI amoCRM's button gives the integration it creates; the same page as RELAY_URL, on that server. */
+export const BUTTON_RELAY_URL = `${CONNECT_ORIGIN}/webhooks/apps/amo-callback`
+/** The page with amoCRM's button, which reads `state` from the fragment (cli-docs services/amo-connect). */
+export const CONNECT_PAGE_URL = `${CONNECT_ORIGIN}/connect/amo.html`
+/** Hands over once the keys amoCRM posted for a `state`. */
+export const CLAIM_URL = `${CONNECT_ORIGIN}/api/amo/claim`
 const REQUEST_MS = 30_000
 const HINT = /^[\w .,:'`-]{1,200}$/
 
@@ -55,11 +66,14 @@ export const appCodec: TokenCodec = {
     const stored = account.decode(raw)
     const entry: unknown = JSON.parse(raw)
     const redirectUri = isRecord(entry) && typeof entry.redirectUri === "string" ? entry.redirectUri : RELAY_URL
-    return Object.assign(stored, { redirectUri })
+    return Object.assign(stored, { redirectUri, browser: isRecord(entry) && entry.browser === true })
   },
 }
 
 const paths = (env: NodeJS.ProcessEnv) => resolvePaths({ appName: IDENTITY.appName, prefix: IDENTITY.envPrefix, env })
+
+/** The folder cli-core's sign-in lock lives in, beside the config. */
+export const lockDirOf = (env: NodeJS.ProcessEnv) => paths(env).config
 
 const credentialsOf = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined, storage: CredentialStorage) => ({
   configDir: paths(env).config,
@@ -189,7 +203,7 @@ export const appProvider = (origin: string, client: OAuthClient, redirectUri: st
   exchange: (params, context) => exchange(origin, redirectUri, params, context),
 })
 
-const fetchFor = (origin: string, given?: typeof fetch) =>
+export const fetchFor = (origin: string, given?: typeof fetch) =>
   given ?? hostFetch({ hosts: [new URL(origin).hostname], timeoutMs: REQUEST_MS })
 
 export interface AppSignInOptions<T> {
@@ -244,7 +258,9 @@ export const appAuthOf = (options: {
   signal?: AbortSignal | undefined
 }): AppAuth | undefined => {
   const storage = appStorage(options.env, options.profile, options.keyring)
-  const stored = storage.read() as (ReturnType<TokenStorage["read"]> & { redirectUri?: string }) | undefined
+  const stored = storage.read() as
+    | (ReturnType<TokenStorage["read"]> & { redirectUri?: string; browser?: boolean })
+    | undefined
   if (!stored) return undefined
   if (!stored.account || !stored.client)
     throw new CliError("authentication_error", "the saved amoCRM sign-in cannot be read; sign in again", {
@@ -256,7 +272,9 @@ export const appAuthOf = (options: {
     storage,
     lockDir: paths(options.env).config,
     fetch: fetchFor(origin, options.fetch),
-    signInCommand: `${IDENTITY.command} ${options.profile} session start --host ${origin} --client-id ${stored.client.clientId}`,
+    signInCommand: `${IDENTITY.command} ${options.profile} session start --host ${origin} ${
+      stored.browser ? "--one-click" : `--client-id ${stored.client.clientId}`
+    }`,
     ...(options.signal ? { signal: options.signal } : {}),
   })
   return { origin, userId: stored.account.userId, accessToken: (refresh) => keeper.accessToken({ refresh }) }
