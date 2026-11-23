@@ -150,7 +150,7 @@ amo account remove [options]
 
 ## `amo sync`
 
-bring the CRM's copy in the local store up to date: pipelines, companies, contacts, deals and leads that changed since the last sync, or everything with --rescan; a run stops before its deadline or --max-pages and the next one goes on from there. With the activities setting on, also the activities and tasks on the deals and leads it keeps. Then each deal or lead that moved into a stage the stage-tasks setting names opens a local task, once per move
+bring the CRM's copy in the local store up to date: pipelines, companies, contacts, deals that changed since the last sync, or everything with --rescan; a run stops before its deadline or --max-pages and the next one goes on from there
 
 **Changes something on this computer only.**
 
@@ -185,7 +185,7 @@ amo store status
 
 ### `amo store apply`
 
-apply scope mine to the contacts already stored: remove those no deal or lead of the chosen users and no kept company names, and the people they leave empty; counts only unless --yes, under scope all too. A sync that narrows the scope, or sync --rescan under mine, does this itself
+apply scope mine to the contacts already stored: remove those no deal of the chosen users and no kept company names, and the people they leave empty; counts only unless --yes, under scope all too. A sync that narrows the scope, or sync --rescan under mine, does this itself
 
 **Changes something on this computer only.**
 
@@ -475,7 +475,7 @@ amo deals create [options]
 
 **Returns:** crm write — operation_id, untrusted, deal, lead; every field: amo commands info deals create
 
-**Example:** `amo work deals create --title "Example kitchen" --amount 15000 --currency EUR`, `amo work deals create --title "Example office" --pipeline Sales --stage "Quote sent" --field UF_CRM_SOURCE=web`
+**Example:** `amo work deals create --title "Example kitchen" --amount 15000 --currency EUR`, `amo work deals create --title "Example office" --pipeline Sales --stage "Quote sent" --field Source=web`
 
 ### `amo deals update`
 
@@ -504,7 +504,7 @@ amo deals update <deal> [options]
 
 **Returns:** crm write — operation_id, untrusted, deal, lead; every field: amo commands info deals update
 
-**Example:** `amo work deals update deal:12 --amount 18000`, `amo work deals update deal:12 --field UF_CRM_SOURCE=`
+**Example:** `amo work deals update deal:12 --amount 18000`, `amo work deals update deal:12 --field Source=`
 
 ### `amo deals move`
 
@@ -566,7 +566,7 @@ amo pipelines list [query]
 
 **Returns:** pipeline — id, ref, name, kind, account, external_id, stages, created_at, and 9 more; every field: amo commands info pipelines list
 
-**Example:** `amo work pipelines list --json`, `amo work pipelines list kind:lead`
+**Example:** `amo work pipelines list --json`
 
 ### `amo pipelines show`
 
@@ -607,7 +607,7 @@ amo stages list [query]
 
 **Returns:** stage — name, position, outcome, external_id, open, pipeline, pipeline_name, kind, and 7 more; every field: amo commands info stages list
 
-**Example:** `amo work stages list --json`, `amo work stages list kind:lead`
+**Example:** `amo work stages list --json`
 
 ## `amo people`
 
@@ -863,11 +863,11 @@ amo activities list [query] [options]
 
 ## `amo changes`
 
-what changed in the CRM's deals, leads, activities and contacts, as the syncs copied it
+what changed in the CRM's deals, activities and contacts, as the syncs copied it
 
 ### `amo changes list`
 
-deals and leads made, moved, won, lost and given another owner, activities added and done, and contacts added, newest first; the last day unless at: says otherwise
+deals made, moved, won, lost and given another owner, activities added and done, and contacts added, newest first; the last day unless at: says otherwise
 
 ```sh
 amo changes list [query] [options]
@@ -889,7 +889,7 @@ amo changes list [query] [options]
 
 ## `amo fields`
 
-the CRM's own fields on deals, leads, people and organizations, as last synced
+the CRM's own fields on deals, people and organizations, as last synced
 
 ### `amo fields list`
 
@@ -920,7 +920,7 @@ search what the local store holds
 
 ### `amo search all`
 
-search the CRM's deals and leads by the words of their title, company, contacts and activities, and the messages, notes, calendar events and meetings other WireCat tools stored — best match first. Use it when you do not know where something was written
+search the CRM's deals by the words of their title, company, contacts and activities, and the messages, notes, calendar events and meetings other WireCat tools stored — best match first. Use it when you do not know where something was written
 
 ```sh
 amo search all <query> [options]
@@ -928,7 +928,7 @@ amo search all <query> [options]
 
 | Argument | | What it is |
 |---|---|---|
-| `query` | required | words and "phrases"; deals and leads match the words of their title, company, contacts and activities. |
+| `query` | required | words and "phrases"; deals match the words of their title, company, contacts and activities. |
 
 | Option | What it does |
 |---|---|
@@ -1005,7 +1005,7 @@ run a amo command or an agent later or on a timer (systemd, launchd, Task Schedu
 
 ### `amo schedule command`
 
-run amo <args…> on a timer — reads save what they read, so this is how a chat's history fills the store
+run amo <args…> on a timer — reads save what they read, so this is how the store stays current
 
 **Changes something on this computer only.**
 
@@ -1016,7 +1016,7 @@ amo schedule command <name> <args> [options]
 | Argument | | What it is |
 |---|---|---|
 | `name` | required | lowercase letters, digits and dashes. |
-| `args` | required | the amo command after its name, e.g. -- messages list <chat> --limit 50. |
+| `args` | required | the amo command after its name, e.g. -- doctor. |
 
 | Option | What it does |
 |---|---|
@@ -1042,7 +1042,7 @@ amo schedule agent <name> <harness> <prompt> [options]
 |---|---|---|
 | `name` | required | lowercase letters, digits and dashes. |
 | `harness` | required | the agent to start. One of: `claude`, `codex`, `gemini`, `cursor`, `opencode`, `openclaw`, `hermes`, `grok`, `kimi`. |
-| `prompt` | required | what to do, e.g. "summarize what came in during the last day: amo personal search messages 'date>1d' --newest --limit 20". |
+| `prompt` | required | what to do, e.g. "say what needs attention in this installation: amo doctor". |
 
 | Option | What it does |
 |---|---|
