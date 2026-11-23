@@ -2,6 +2,34 @@
 
 Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
+## 0.3.0 — 23.11.2026
+
+### Added
+
+- **Sign in with one click: `amo <profile> session start --host https://<subdomain>.amocrm.ru --one-click`.** The
+  browser opens a page on connect.wirecat.dev, a WireCat server in Russia that amoCRM can reach. The person
+  chooses the account and clicks «Разрешить», and amoCRM creates a WireCat integration in it. Nobody copies an
+  integration ID, a secret key or a token. amoCRM sends the integration's secret key to connect.wirecat.dev, and `amo`
+  collects it once. `amo` exchanges the code only with the account `--host` names, and refuses one allowed in another
+  account. It keeps and renews the sign-in like `--client-id`. amoCRM lets only an account administrator allow it
+  ([amoCRM: the button](https://www.amocrm.ru/developers/content/oauth/button)). amoCRM accounts only for now; Kommo
+  signs in with a token.
+- **`amo setup` offers «Войти через amoCRM» first to an administrator,** with the token second. WireCat Desktop shows
+  the link to open, and waits until access is allowed.
+- **`amo setup` asks whether you are an account administrator.** An administrator creates the integration as before.
+  A user who is not one gets the request to send an administrator for a long-lived token, a warning that the token
+  carries the administrator's rights, and, once connected, how to sync their own deals rather than the administrator's.
+  WireCat Desktop shows the same steps. The installation page has the same path under "If you are not an
+  administrator".
+
+### Fixed
+
+- **The shared CRM help no longer mentions leads or Bitrix24's fields.** amoCRM has no separate leads: `changes list`,
+  `search all` and the other shared commands now describe deals only.
+- The setup and the installation page no longer say that anyone can sign in through the integration in the browser:
+  amoCRM's guide says it offers that sign-in only on accounts where the person is an administrator
+  (https://www.amocrm.ru/developers/content/oauth/step-by-step).
+
 ## 0.2.0 — 19.11.2026
 
 ### Added
