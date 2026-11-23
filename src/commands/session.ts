@@ -29,22 +29,16 @@ import {
   signInSteps,
   type TokenStorage,
 } from "@wirecat/cli-core/cli"
+import { refuseTakenCrmAccount } from "@wirecat/cli-core/crm/cli"
 import { Command } from "commander"
 import { accountOrigin, decodeSignIn, encodeSignIn } from "../amo/account.js"
 import { type BrowserSteps, browserSignIn, refuseKommo } from "../amo/button.js"
 import { type AppAuth, appSignIn, appSourceOf, appStorage, RELAY_URL } from "../amo/oauth.js"
 import { configuration } from "../config.js"
-import {
-  type AmoEnvironment,
-  appAuthFor,
-  contextOf,
-  storedSignIn,
-  transportFor,
-  withAccount,
-  withoutKeyring,
-} from "../context.js"
+import { type AmoEnvironment, appAuthFor, contextOf, storedSignIn, transportFor, withAccount } from "../context.js"
 import { IDENTITY } from "../identity.js"
 import { accountUser } from "../whoami.js"
+import { AMO_ACCOUNT } from "./account.js"
 
 const AMO = IDENTITY.command
 
@@ -58,43 +52,14 @@ const storageOf = (raw: string): TokenStorage => {
 const tokensHere = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined) =>
   new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) })
 
-/** The account host and user a profile's saved sign-in reaches, either kind; one from `AMO_TOKEN` is no profile's. */
-export const signedInAs = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined, profile: string) => {
-  const app = withoutKeyring(
-    () => appStorage(env, profile, keyring).read()?.account,
-    () => tokensHere(env, keyring).read(profile),
-  )
-  if (app) return { host: new URL(app.host).host, userId: app.userId }
-  const saved = tokensHere(env, keyring).read(profile)
-  if (!saved || saved.source === "environment") return undefined
-  const signIn = decodeSignIn(saved.secret)
-  return { host: new URL(signIn.origin).host, userId: signIn.userId }
-}
-
 /** A second profile on the same account and user would sync the same copy twice and split its permissions. */
-const refuseDuplicate = (
-  env: NodeJS.ProcessEnv,
-  keyring: KeyringStore | undefined,
-  profile: string,
-  at: { host: string; userId: string },
-) => {
-  // biome-ignore lint/plugin/no-own-settings: this check reads every profile, and baseContext names one
-  const { configuredProfiles } = configuration.resolveSettings({}, { env, needsProfile: false })
-  const other = profilesHere(IDENTITY, configuredProfiles, env).find((one) => {
-    if (one === profile) return false
-    try {
-      const found = signedInAs(env, keyring, one)
-      return found?.host === at.host && found.userId === at.userId
-    } catch {
-      return false
-    }
-  })
-  if (!other) return
-  throw new CliError(
-    "conflict",
-    `profile ${other} already signs in to ${at.host} as user ${at.userId}. Use \`${AMO} ${other}\`, sign it in ` +
-      `again with \`${AMO} ${other} session start\`, or end it with \`${AMO} ${other} session end\` first`,
-    { reason: "session.duplicate", profile: other, account: at.host },
+const refuseTaken = (command: Command, at: { account: string; user: string }) => {
+  const { env, profile, keyring, settings } = contextOf(command)
+  refuseTakenCrmAccount(
+    IDENTITY,
+    AMO_ACCOUNT,
+    { env, profile, profiles: settings.configuredProfiles, ...(keyring ? { keyring } : {}) },
+    at,
   )
 }
 
@@ -103,9 +68,9 @@ const refuseDuplicate = (
  * the token's user, and the account as `session start` remembers it. `setup apply` runs the same check.
  */
 export const checkedToken = async (command: Command, origin: string, token: string) => {
-  const { env, profile, keyring, run } = contextOf(command)
+  const { run } = contextOf(command)
   const who = await run((events) => accountUser(transportFor(command, { origin, token }, events)))
-  refuseDuplicate(env, keyring, profile, { host: who.account, userId: who.user.id })
+  refuseTaken(command, { account: who.account, user: who.user.id })
   return {
     who,
     signIn: encodeSignIn({ origin, token, userId: who.user.id }),
@@ -180,9 +145,8 @@ const stepsOf = (command: Command) => {
 
 /** The account user a new integration sign-in carries, refused when another profile here already is that user. */
 const checkedUser = (command: Command, events: EventSink) => async (auth: AppAuth) => {
-  const { env, keyring, profile } = contextOf(command)
   const found = await accountUser(transportFor(command, auth, events))
-  refuseDuplicate(env, keyring, profile, { host: found.account, userId: found.user.id })
+  refuseTaken(command, { account: found.account, user: found.user.id })
   return { ...found, id: found.user.id }
 }
 

@@ -15,8 +15,6 @@ const OWN: [reason: string, code: string, message: string][] = [
   ["connect.url-invalid", "configuration_error", "AMO_CONNECT_URL is not an https address"],
   ["oauth.browser-amocrm-only", "validation_error", "the browser sign-in works only for amoCRM accounts at amocrm.ru"],
   ["session.expired", "authentication_error", "amoCRM refused the token: it expired or was revoked"],
-  ["session.duplicate", "conflict", "another profile here already signs in to this account as this user"],
-  ["account-remove.account-shared", "conflict", "another profile reads the same account, whose copy the store shares"],
   ["amo.subscription-ended", "permission_error", "the amoCRM subscription has ended"],
   ["amo.access-denied", "permission_error", "the token's user may not do this in amoCRM"],
   ["amo.blocked", "permission_error", "amoCRM blocks every request from here"],

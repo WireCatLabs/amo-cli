@@ -10,6 +10,7 @@ import { contextOf, signInOf, storedSignIn, transportFor } from "../context.js"
 import { AMO_WRITES } from "../crm/writer.js"
 import { IDENTITY } from "../identity.js"
 import { accountUser } from "../whoami.js"
+import { AMO_ACCOUNT } from "./account.js"
 
 /** The selected profile's account for one command; cli-core closes the store before the answer prints. */
 /**
@@ -107,6 +108,7 @@ export const crmSharedCommands = (): Command[] => {
     writes: AMO_WRITES,
     live: ["person", "organization", "user"],
     activities: true,
+    account: AMO_ACCOUNT,
   })
   return [...holder.commands]
 }
