@@ -28,7 +28,7 @@ Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
   `search all` and the other shared commands now describe deals only.
 - The setup and the installation page no longer say that anyone can sign in through the integration in the browser:
   amoCRM's guide says it offers that sign-in only on accounts where the person is an administrator
-  (https://www.amocrm.ru/developers/content/oauth/step-by-step).
+  ([amoCRM: step by step](https://www.amocrm.ru/developers/content/oauth/step-by-step)).
 
 ## 0.2.0 — 19.11.2026
 
