@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# A real one-click amoCRM sign-in with this checkout's build, in throwaway folders:
+#
+#   bin/one-click-live https://example.amocrm.ru
+#
+# It builds, signs in by the button, checks the session and ends it. The sign-in goes to a temporary keyring entry,
+# which `session end` removes. Run it once as an administrator and once as a user without administrator rights
+# (docs/dev/TESTING.md, "One-click sign-in by hand").
+require "tmpdir"
+
+ROOT = File.expand_path("..", __dir__)
+AMO = File.join(ROOT, "dist/bin/amo.js")
+
+host = ARGV.fetch(0) { abort "usage: bin/one-click-live https://example.amocrm.ru" }
+abort "the address must start with https://" unless host.start_with?("https://")
+profile = host.delete_prefix("https://").split(".").first
+work_dir = Dir.mktmpdir("amo-one-click-")
+env = {
+  "AMO_CONFIG_DIR" => File.join(work_dir, "config"),
+  "AMO_STATE_DIR" => File.join(work_dir, "state"),
+  "MESSAGING_STORE" => File.join(work_dir, "store.db"),
+  "AMO_NO_UPDATE_CHECK" => "1"
+}
+
+def amo(env, profile, *args)
+  puts "\n$ amo #{profile} #{args.join(' ')}"
+  system(env, "node", AMO, profile, *args)
+end
+
+abort "build failed" unless system("pnpm", "build", chdir: ROOT, out: File::NULL)
+puts "Folder for this run: #{work_dir}"
+puts "Open the link in the browser window where the amoCRM user you test is signed in, and press the button."
+started = amo(env, profile, "session", "start", "--host", host, "--one-click")
+checked = started && amo(env, profile, "session", "status", "--check")
+amo(env, profile, "session", "end")
+puts "\nResult: #{checked ? 'PASSED' : 'FAILED'}"
+exit(checked ? 0 : 1)
