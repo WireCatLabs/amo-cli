@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/WireCatLabs/amo-cli/blob/main/docs/index.md">Docs</a> ·
-  <a href="https://github.com/WireCatLabs/amo-cli/blob/main/docs/installation.md">Install</a> ·
+  <a href="https://wirecat.dev/en/docs/amo">Docs</a> ·
+  <a href="https://wirecat.dev/en/docs/amo/installation">Install</a> ·
   <a href="https://github.com/WireCatLabs/amo-cli/blob/main/docs/usage.md">Usage</a> ·
   <a href="https://t.me/wirecatdev">Telegram</a>
 </p>
@@ -73,6 +73,9 @@ How it compares with other amoCRM and Kommo tools and MCP servers:
 and write notes by itself. In `amo` that takes `api call`, which you run yourself after you allow it.
 
 ## Quick start
+
+In [WireCat Desktop](https://wirecat.dev/en/download), add amoCRM from the tool list and give it the account's address
+and a long-lived token when it asks. Or in a terminal:
 
 ```sh
 npm install -g @wirecat/amo-cli
