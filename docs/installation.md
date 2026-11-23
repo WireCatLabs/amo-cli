@@ -1,8 +1,9 @@
 # Install and connect
 
 Connect your amoCRM or Kommo account once, and from then on your AI agent can read and update your deals. The CRM keeps
-your deals, contacts and companies in the cloud, and it lets a program in only through a private integration that an
-account administrator makes.
+your deals, contacts and companies in the cloud. An amoCRM administrator lets `amo` in with one click in the browser,
+with no integration of their own. Kommo, and users who are not administrators, paste a key from a private integration
+that an administrator makes.
 
 Your agent then answers which deals are open, moves a deal to the next stage or finds a client, from a terminal or over
 MCP, as far as the permissions you set allow. You run the same commands yourself, or from a script.

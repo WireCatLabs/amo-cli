@@ -200,8 +200,9 @@ More: [command reference](https://github.com/WireCatLabs/amo-cli/blob/main/docs/
 ## Settings and permissions
 
 Each profile has a permission level for every command and every API operation: `allow`, `ask`, `readonly` or `deny`.
-Creating and changing deals, contacts and companies is allowed. Deletes and most other writes ask first. Messages to
-clients, Salesbots, webhooks, writing tasks and giving a record to another user are denied until you allow them.
+Creating and changing deals, contacts and companies is allowed. Deletes and most other writes ask first in a
+terminal, and run without asking over MCP. Messages to clients, Salesbots, webhooks, writing tasks and giving a
+record to another user are denied until you allow them.
 
 ```sh
 amo work config set permissions.deals.close deny   # this profile closes no deal

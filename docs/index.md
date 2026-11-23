@@ -6,7 +6,8 @@ even offline. It moves and closes deals for you too, as far as you allow.
 
 Ask which deals are stuck in "Quote sent", what changed in the CRM since yesterday, or how the Sales pipeline did in
 the last 30 days. The agent answers with the deal, its amount and its owner. amoCRM and Kommo have no MCP server of
-their own for this data. You need one private integration in the account, which an administrator makes once.
+their own for this data. An administrator of an amoCRM account signs in with one click. Kommo, and users who are not administrators, sign in
+with a token from a private integration that an administrator makes once.
 
 **On this page:**
 
@@ -103,7 +104,7 @@ Another tool fits better when an agent should set tasks and write notes by itsel
 
 - **A copy on your computer.** `sync` puts your deals and their clients into the WireCat local store, the one file on
   your computer that every WireCat tool shares. Lists, the funnel and search read it, also offline.
-- **Sign-in with a token or through the integration.** Either is kept in the system keyring, or in a private file on
+- **Sign-in with one click, a token or through the integration.** Each is kept in the system keyring, or in a private file on
   a computer without one. [Install and connect](installation.md)
 - **Made for scripts and agents.** `--json` gives a JSON answer, and an error comes with a code to branch on.
   [MCP](mcp.md)
