@@ -61,25 +61,10 @@ but never a client's name or the token.
 
 ## One-click sign-in by hand
 
-The button sign-in (`session start --one-click`) needs a person in a browser, so `bin/amo-live` cannot run it.
-`bin/one-click-live https://example.amocrm.ru` builds this checkout, prints a link, waits for the address the
-browser ends on, checks the session and ends it. Config, state and the store are a throwaway folder, and the
-sign-in goes to a temporary keyring entry that `session end` removes. Each button press adds an integration
-«WireCat» to the account: remove the test ones in amoCRM afterwards.
-
-amoCRM's help says only an administrator can install an integration. To check what a user without those rights sees:
-
-1. As an administrator: «Настройки» → «Пользователи» → «+ Добавить пользователя»
-   ([amoCRM help](https://www.amocrm.ru/support/user/create_users/)). Give an address you can read, a password, and
-   no administrator rights: the group «Бесплатные пользователи»
-   ([help](https://www.amocrm.ru/support/free_user/create_free_users/)) takes no paid seat. If amoCRM asks to buy
-   a seat, stop.
-2. In a private browser window, sign in to amoCRM as that user.
-3. Run `bin/one-click-live`, open its link in that private window, press the button and paste back the address
-   the window ends on.
-
-A refusal is an answer too: then the user's way in stays a token an administrator makes. Record the result in
-[DESIGN.md](DESIGN.md#open-questions-for-the-owner) and in the sign-in section of the docs.
+The button sign-in needs a person in a browser, so `bin/amo-live` cannot run it. `bin/one-click-live
+https://example.amocrm.ru` builds this checkout, opens the sign-in in a private Firefox window (no amoCRM sign-in
+there, so amoCRM asks who signs in), checks the session and ends it, all in throwaway folders. The owner's steps,
+including the test as a user who is not an administrator: [one-click-test.ru.md](one-click-test.ru.md).
 
 ## The bundle a user installs
 

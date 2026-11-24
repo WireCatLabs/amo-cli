@@ -5,23 +5,32 @@
 #
 #   bin/one-click-live https://example.amocrm.ru
 #
-# It builds, signs in by the button, checks the session and ends it. The sign-in goes to a temporary keyring entry,
-# which `session end` removes. Run it once as an administrator and once as a user without administrator rights
-# (docs/dev/TESTING.md, "One-click sign-in by hand").
+# It builds, opens the sign-in page in a private Firefox window, checks the session and ends it. The private window
+# carries no amoCRM sign-in, so amoCRM asks who signs in: the administrator or any other user. The sign-in goes to a
+# temporary keyring entry, which `session end` removes. The owner's steps: docs/dev/one-click-test.ru.md.
 require "tmpdir"
 
 ROOT = File.expand_path("..", __dir__)
 AMO = File.join(ROOT, "dist/bin/amo.js")
+FIREFOX = "/home/leemour/Apps/firefox-developer/firefox"
 
 host = ARGV.fetch(0) { abort "usage: bin/one-click-live https://example.amocrm.ru" }
 abort "the address must start with https://" unless host.start_with?("https://")
 profile = host.delete_prefix("https://").split(".").first
 work_dir = Dir.mktmpdir("amo-one-click-")
+
+# amo opens its link with xdg-open; this one opens it in a private window instead.
+shim_dir = File.join(work_dir, "bin")
+Dir.mkdir(shim_dir)
+File.write(File.join(shim_dir, "xdg-open"), "#!/bin/sh\nexec #{FIREFOX} --private-window \"$1\"\n")
+File.chmod(0o755, File.join(shim_dir, "xdg-open"))
+
 env = {
   "AMO_CONFIG_DIR" => File.join(work_dir, "config"),
   "AMO_STATE_DIR" => File.join(work_dir, "state"),
   "MESSAGING_STORE" => File.join(work_dir, "store.db"),
-  "AMO_NO_UPDATE_CHECK" => "1"
+  "AMO_NO_UPDATE_CHECK" => "1",
+  "PATH" => "#{shim_dir}:#{ENV.fetch('PATH')}"
 }
 
 def amo(env, profile, *args)
@@ -29,9 +38,9 @@ def amo(env, profile, *args)
   system(env, "node", AMO, profile, *args)
 end
 
+puts "Building…"
 abort "build failed" unless system("pnpm", "build", chdir: ROOT, out: File::NULL)
-puts "Folder for this run: #{work_dir}"
-puts "Open the link in the browser window where the amoCRM user you test is signed in, and press the button."
+puts "A private Firefox window opens. Press the button there and sign in to amoCRM as the user you test."
 started = amo(env, profile, "session", "start", "--host", host, "--one-click")
 checked = started && amo(env, profile, "session", "status", "--check")
 amo(env, profile, "session", "end")
