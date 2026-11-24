@@ -2,6 +2,25 @@
 
 Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
+## 0.4.0 — 24.11.2026
+
+### Changed — may break callers
+
+- **`account remove` and the check against a second sign-in are cli-core's shared CRM ones** (`@wirecat/cli-core`
+  0.722.0). The reasons stay `account-remove.account-shared` and `session.duplicate`, with the same details, and a
+  dry run still warns. The refusal now says `amoCRM account <host>`.
+- **`account remove --delete-data` refuses when amo cannot tell which account another profile holds**
+  (`account-remove.account-unknown`, detail `profile`): a profile whose saved sign-in is unreadable and that
+  `session start` never remembered. `--keep-data` still removes.
+- **`session start` refuses a profile named `files` or `foreign-contacts`** (`profile.reserved`): every account
+  shares those folders in the state folder.
+
+### Fixed
+
+- **The install guide quotes amoCRM's refusal for a user who is not an administrator.** The one-click sign-in shows
+  that user's account too, and amoCRM refuses under «Разрешить»: «Первичная установка интеграции доступна только
+  администраторам аккаунта». The guide said the sign-in listed only the accounts where one is an administrator.
+
 ## 0.3.0 — 23.11.2026
 
 ### Added
