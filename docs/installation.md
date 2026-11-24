@@ -61,7 +61,9 @@ amo work session start --host https://example.amocrm.ru --one-click
 What happens behind the click:
 
 - amoCRM lets only an account administrator allow this
-  ([amoCRM: the button](https://www.amocrm.ru/developers/content/oauth/button)). The integration then shows in
+  ([amoCRM: the button](https://www.amocrm.ru/developers/content/oauth/button)). Anyone else sees «Интеграция не
+  может быть установлена в выбранный аккаунт. Первичная установка интеграции доступна только администраторам
+  аккаунта.» under the «Разрешить» button. The integration then shows in
   амоМаркет, where an administrator can switch it off.
 - amoCRM sends the new integration's secret key to connect.wirecat.dev, a WireCat server in Russia that amoCRM's
   servers can reach. `amo` collects the key from there once, and the server keeps no copy.
@@ -153,8 +155,9 @@ the accounts where you are an administrator
 ## If you are not an administrator
 
 You can tell by the menu on the left in amoCRM: without **амоМаркет** there, you are not an administrator. Only an
-administrator can create the integration and its key, and the browser sign-in offers only accounts where you are one. So
-you connect with a key an administrator makes for you:
+administrator can create the integration and its key. The one-click sign-in shows your account too, but amoCRM refuses
+it with «Первичная установка интеграции доступна только администраторам аккаунта». So you connect with a key an
+administrator makes for you:
 
 1. Send an administrator of your account the link to this page, and ask for a private integration and its long-lived
    token.
