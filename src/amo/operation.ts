@@ -1,5 +1,5 @@
 import { CliError } from "@wirecat/cli-base"
-import type { Effect } from "@wirecat/cli-base/codegen"
+import type { Effect } from "@wirecat/cli-base/codegen/runtime"
 import { ENTITY_TYPES, EXTRA_OPERATIONS } from "./allow-list.js"
 import { SPEC_OPERATIONS } from "./operations.js"
 

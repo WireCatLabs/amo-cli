@@ -58,7 +58,7 @@ const openProfile = async (command: Command, { readOnly }: { readOnly: boolean }
   const amo = () => (transport ??= transportFor(command, signInOf(command)))
   let source: ReturnType<typeof amoCrmSource> | undefined
   const asked = async () => {
-    const { crmSettingKey } = await import("@wirecat/cli-core/store")
+    const { crmSettingKey } = await import("@wirecat/cli-core/store/areas")
     const scope = await store.crm.scope(account)
     return {
       mode: scope.mode,

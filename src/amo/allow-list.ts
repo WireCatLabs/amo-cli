@@ -1,4 +1,4 @@
-import type { SchemaNode } from "@wirecat/cli-base/codegen"
+import type { SchemaNode } from "@wirecat/cli-base/codegen/runtime"
 import type { SpecOperation } from "./operation.js"
 
 /*
