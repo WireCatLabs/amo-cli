@@ -2,6 +2,39 @@
 
 Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
+## 0.5.0 — 25.11.2026
+
+### Added
+
+- **`search all` finds deals and leads by the meaning of their notes, calls and tasks**, in other words or another
+  language, with the note's excerpt in the hit. `amo work sync --embed` builds the index with a model already
+  downloaded (`amo models download embeddinggemma`); until then `search all` says it searched by words only
+  (`@wirecat/cli-core` 0.751.0).
+- **`people show` and `organizations show` take the `person:<id>` and `organization:<id>` a deal gives.**
+- **`sync --embed` and `search all` by meaning** (cli-core 0.751.0). With the `activities` setting on, `sync --embed`
+  indexes the copied comments and tasks with a model already downloaded, and `search all` then finds deals by what
+  they mean, in Russian or any language, not only by their words. The skill tells an agent to ask by meaning before
+  it reads every note.
+
+### Changed — may break callers
+
+- **`synced[].saved` in the `sync` answer counts only rows that changed** (new, different, deleted or back again), so
+  a sync with nothing new answers 0.
+- **amo is built on cli-core 1.0 and cli-base 1.0.** After its first run the store is at version 74, and only tools
+  on cli-core 1.0 open it: upgrade every WireCat CLI on this computer together. The migration keeps a rollback copy,
+  and refuses to run when it cannot write one (`store migrate --no-backup` migrates anyway).
+- **`sync --rescan` no longer lets a sync mark most of a kind deleted.** It only lists everything again. When the
+  guard holds a pass, `sync --allow-deletions <count>` lets it mark at most that many records deleted. The flag is
+  for the owner in a terminal; the MCP server does not offer it.
+- **An MCP call that names a refused folder answers `permission_error`**, not `validation_error`.
+
+### Fixed
+
+- **A deal moved in the same second its stage-task rules were set opens its task.**
+- `search all` lists a name one letter off the one that matched after it, and finds a Latin name typed in Cyrillic
+  letters and a Russian name typed in Latin letters, each marked `match: corrected`.
+- `people show` and `organizations show` take the `person:<id>` and `organization:<id>` a deal gives.
+
 ## 0.4.0 — 24.11.2026
 
 ### Changed — may break callers
