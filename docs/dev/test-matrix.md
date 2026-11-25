@@ -7,24 +7,25 @@ ran it · ⛔ not tested offline, with the reason and where it is checked instea
 Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 [TESTING.md](TESTING.md) for how, and for the states and failures that cut across commands.
 
-**184 ✅ · 64 ⛔ · 0 ❌** — 87 commands, 161 options.
+**83 ✅ · 65 ⛔ · 101 ❌** — 87 commands, 162 options.
 
 | Command | Option | | Note |
 |---|---|---|---|
-| `commands` |  | ✅ |  |
-| `commands info` |  | ✅ |  |
-| `session start` |  | ✅ |  |
-| `session start` | `--host` | ✅ |  |
-| `session start` | `--client-id` | ✅ |  |
-| `session start` | `--one-click` | ✅ |  |
-| `session start` | `--credential-storage` | ✅ |  |
-| `session status` |  | ✅ |  |
-| `session status` | `--check` | ✅ |  |
-| `session end` |  | ✅ |  |
-| `session list` |  | ✅ |  |
+| `commands` |  | ❌ |  |
+| `commands info` |  | ❌ |  |
+| `session start` |  | ❌ |  |
+| `session start` | `--host` | ❌ |  |
+| `session start` | `--client-id` | ❌ |  |
+| `session start` | `--one-click` | ❌ |  |
+| `session start` | `--credential-storage` | ❌ |  |
+| `session status` |  | ❌ |  |
+| `session status` | `--check` | ❌ |  |
+| `session end` |  | ❌ |  |
+| `session list` |  | ❌ |  |
 | `sync` |  | ✅ |  |
 | `sync` | `--rescan` | ✅ |  |
 | `sync` | `--max-pages` | ✅ |  |
+| `sync` | `--embed` | ⛔ | cli-core's CRM sync embeds activities; its src/crm/cli/activity-meaning.test.ts drives sync --embed and search all by meaning on a CRM program with the small test model, and a test here would need a model on disk |
 | `store status` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
 | `store apply` |  | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
 | `store apply` | `--yes` | ⛔ | cli-core's addStoreMaintenanceCommands, mounted by addCrmCommands; its store and src/crm/cli/store-file tests drive them on a CRM program |
@@ -50,18 +51,18 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `deals list` | `--limit` | ✅ |  |
 | `deals list` | `--page` | ✅ |  |
 | `deals list` | `--format` | ✅ |  |
-| `deals show` |  | ✅ |  |
+| `deals show` |  | ❌ |  |
 | `deals create` |  | ✅ |  |
 | `deals create` | `--title` | ✅ |  |
 | `deals create` | `--pipeline` | ✅ |  |
 | `deals create` | `--stage` | ✅ |  |
-| `deals create` | `--amount` | ✅ |  |
-| `deals create` | `--currency` | ✅ |  |
+| `deals create` | `--amount` | ❌ |  |
+| `deals create` | `--currency` | ❌ |  |
 | `deals create` | `--close-date` | ✅ |  |
 | `deals create` | `--owner` | ✅ |  |
 | `deals create` | `--field` | ✅ |  |
 | `deals update` |  | ✅ |  |
-| `deals update` | `--title` | ✅ |  |
+| `deals update` | `--title` | ❌ |  |
 | `deals update` | `--pipeline` | ✅ |  |
 | `deals update` | `--stage` | ✅ |  |
 | `deals update` | `--amount` | ✅ |  |
@@ -69,10 +70,10 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `deals update` | `--close-date` | ✅ |  |
 | `deals update` | `--owner` | ✅ |  |
 | `deals update` | `--field` | ✅ |  |
-| `deals move` |  | ✅ |  |
-| `deals close` |  | ✅ |  |
-| `deals close` | `--reason` | ✅ |  |
-| `pipelines list` |  | ✅ |  |
+| `deals move` |  | ❌ |  |
+| `deals close` |  | ❌ |  |
+| `deals close` | `--reason` | ❌ |  |
+| `pipelines list` |  | ❌ |  |
 | `pipelines show` |  | ✅ |  |
 | `pipelines show` | `--since-time` | ✅ |  |
 | `pipelines show` | `--until-time` | ✅ |  |
@@ -81,11 +82,11 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `people list` | `--limit` | ✅ |  |
 | `people list` | `--page` | ✅ |  |
 | `people list` | `--format` | ✅ |  |
-| `people show` |  | ✅ |  |
+| `people show` |  | ❌ |  |
 | `people create` |  | ✅ |  |
 | `people create` | `--name` | ✅ |  |
 | `people create` | `--first-name` | ✅ |  |
-| `people create` | `--last-name` | ✅ |  |
+| `people create` | `--last-name` | ❌ |  |
 | `people create` | `--position` | ✅ |  |
 | `people create` | `--email` | ✅ |  |
 | `people create` | `--phone` | ✅ |  |
@@ -94,7 +95,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `people update` |  | ✅ |  |
 | `people update` | `--name` | ✅ |  |
 | `people update` | `--first-name` | ✅ |  |
-| `people update` | `--last-name` | ✅ |  |
+| `people update` | `--last-name` | ❌ |  |
 | `people update` | `--position` | ✅ |  |
 | `people update` | `--email` | ✅ |  |
 | `people update` | `--phone` | ✅ |  |
@@ -104,7 +105,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `organizations list` | `--limit` | ✅ |  |
 | `organizations list` | `--page` | ✅ |  |
 | `organizations list` | `--format` | ✅ |  |
-| `organizations show` |  | ✅ |  |
+| `organizations show` |  | ❌ |  |
 | `organizations create` |  | ✅ |  |
 | `organizations create` | `--name` | ✅ |  |
 | `organizations create` | `--email` | ✅ |  |
@@ -112,7 +113,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `organizations create` | `--owner` | ✅ |  |
 | `organizations create` | `--field` | ✅ |  |
 | `organizations update` |  | ✅ |  |
-| `organizations update` | `--name` | ✅ |  |
+| `organizations update` | `--name` | ❌ |  |
 | `organizations update` | `--email` | ✅ |  |
 | `organizations update` | `--phone` | ✅ |  |
 | `organizations update` | `--owner` | ✅ |  |
@@ -120,7 +121,7 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `users list` |  | ✅ |  |
 | `users list` | `--limit` | ✅ |  |
 | `users list` | `--page` | ✅ |  |
-| `users show` |  | ✅ |  |
+| `users show` |  | ❌ |  |
 | `activities list` |  | ✅ |  |
 | `activities list` | `--limit` | ✅ |  |
 | `activities list` | `--page` | ✅ |  |
@@ -139,19 +140,19 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `search all` | `--page` | ✅ |  |
 | `search all` | `--exact` | ✅ |  |
 | `search all` | `--timezone` | ✅ |  |
-| `account remove` |  | ✅ |  |
-| `account remove` | `--keep-data` | ✅ |  |
-| `account remove` | `--delete-data` | ✅ |  |
-| `account remove` | `--dry-run` | ✅ |  |
-| `api list` |  | ✅ |  |
-| `api show` |  | ✅ |  |
-| `api call` |  | ✅ |  |
-| `api call` | `--params` | ✅ |  |
-| `api call` | `--body` | ✅ |  |
-| `api call` | `--dry-run` | ✅ |  |
-| `schedule command` |  | ✅ |  |
-| `schedule command` | `--every` | ✅ |  |
-| `schedule command` | `--at` | ✅ |  |
+| `account remove` |  | ❌ |  |
+| `account remove` | `--keep-data` | ❌ |  |
+| `account remove` | `--delete-data` | ❌ |  |
+| `account remove` | `--dry-run` | ❌ |  |
+| `api list` |  | ❌ |  |
+| `api show` |  | ❌ |  |
+| `api call` |  | ❌ |  |
+| `api call` | `--params` | ❌ |  |
+| `api call` | `--body` | ❌ |  |
+| `api call` | `--dry-run` | ❌ |  |
+| `schedule command` |  | ❌ |  |
+| `schedule command` | `--every` | ❌ |  |
+| `schedule command` | `--at` | ❌ |  |
 | `schedule command` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule command` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule command` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
@@ -165,34 +166,34 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `schedule agent` | `--at-time` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule agent` | `--notify-on` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule agent` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
-| `schedule list` |  | ✅ |  |
+| `schedule list` |  | ❌ |  |
 | `schedule agents list` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
-| `schedule run` |  | ✅ |  |
+| `schedule run` |  | ❌ |  |
 | `schedule run` | `--no-notify` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule run` | `--deliver-to` | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
-| `schedule remove` |  | ✅ |  |
+| `schedule remove` |  | ❌ |  |
 | `schedule pause` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
 | `schedule resume` |  | ⛔ | cli-core's scheduleCommandFor; its schedule tests drive every timer and option, and src/schedule.test.ts installs, lists and removes amo's sync timer |
-| `schedule exec` |  | ✅ |  |
-| `doctor` |  | ✅ |  |
-| `doctor` | `--online` | ✅ |  |
+| `schedule exec` |  | ❌ |  |
+| `doctor` |  | ❌ |  |
+| `doctor` | `--online` | ❌ |  |
 | `doctor reports show` |  | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |
 | `doctor reports create` |  | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |
 | `doctor reports create` | `--run` | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |
 | `doctor reports create` | `--output` | ⛔ | cli-core's appDoctorCommand; its app-mcp-command test creates and shows a report |
-| `skill show` |  | ✅ |  |
-| `skill show` | `--for` | ✅ |  |
-| `skill install` |  | ✅ |  |
-| `skill install` | `--for` | ✅ |  |
-| `skill status` |  | ✅ |  |
-| `guide` |  | ✅ |  |
-| `mcp serve` |  | ✅ |  |
-| `mcp serve` | `--permission` | ✅ |  |
-| `mcp serve` | `--profiles` | ✅ |  |
+| `skill show` |  | ❌ |  |
+| `skill show` | `--for` | ❌ |  |
+| `skill install` |  | ❌ |  |
+| `skill install` | `--for` | ❌ |  |
+| `skill status` |  | ❌ |  |
+| `guide` |  | ❌ |  |
+| `mcp serve` |  | ❌ |  |
+| `mcp serve` | `--permission` | ❌ |  |
+| `mcp serve` | `--profiles` | ❌ |  |
 | `mcp serve` | `--http` | ⛔ | starts an HTTP server or a background process that runs until stopped; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp serve` | `--port` | ⛔ | starts an HTTP server or a background process that runs until stopped; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp serve` | `--public-url` | ⛔ | starts an HTTP server or a background process that runs until stopped; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
-| `mcp revoke` |  | ✅ |  |
+| `mcp revoke` |  | ❌ |  |
 | `mcp revoke` | `--profiles` | ⛔ | cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp server start` |  | ⛔ | starts a detached `mcp serve --http` from the built entry; cli-core tests mcpServerCommand, and the background run was checked by hand against dist/ |
 | `mcp server start` | `--port` | ⛔ | starts a detached `mcp serve --http` from the built entry; cli-core tests mcpServerCommand, and the background run was checked by hand against dist/ |
@@ -203,59 +204,59 @@ Measured from the test run (`coverage/argv.jsonl`), not searched for — see
 | `mcp server stop` | `--profiles` | ⛔ | stops the detached server that `mcp server start` wrote a pid file for; cli-core tests mcpServerCommand, and no live scenario starts a server to stop |
 | `mcp server status` |  | ⛔ | starts an HTTP server or a background process that runs until stopped; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp server status` | `--profiles` | ⛔ | starts an HTTP server or a background process that runs until stopped; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
-| `mcp config` |  | ✅ |  |
-| `mcp config` | `--permission` | ✅ |  |
-| `mcp config` | `--profiles` | ✅ |  |
+| `mcp config` |  | ❌ |  |
+| `mcp config` | `--permission` | ❌ |  |
+| `mcp config` | `--profiles` | ❌ |  |
 | `mcp add` |  | ⛔ | writes Codex's or Claude Code's own MCP settings; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp add` | `--allow-writes` | ⛔ | writes Codex's or Claude Code's own MCP settings; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp add` | `--permission` | ⛔ | writes Codex's or Claude Code's own MCP settings; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp check` |  | ⛔ | starts the installed CLI as a child process, as the agent would; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
 | `mcp check` | `--permission` | ⛔ | starts the installed CLI as a child process, as the agent would; cli-core's appMcpCommand; its app-mcp-command and mcp-server-command tests drive it, and src/mcp.test.ts runs this CLI's own server, config, revoke and refusals |
-| `upgrade` |  | ✅ |  |
-| `upgrade` | `--check` | ✅ |  |
-| `config show` |  | ✅ |  |
-| `config show` | `--bot` | ✅ |  |
-| `config set` |  | ✅ |  |
-| `config set` | `--defaults` | ✅ |  |
-| `config set` | `--personal` | ✅ |  |
-| `config set` | `--bot` | ✅ |  |
-| `config unset` |  | ✅ |  |
-| `config unset` | `--defaults` | ✅ |  |
-| `config unset` | `--personal` | ✅ |  |
-| `config unset` | `--bot` | ✅ |  |
-| `config migrate` |  | ✅ |  |
-| `config repair` |  | ✅ |  |
-| `config repair` | `--dry-run` | ✅ |  |
+| `upgrade` |  | ❌ |  |
+| `upgrade` | `--check` | ❌ |  |
+| `config show` |  | ❌ |  |
+| `config show` | `--bot` | ❌ |  |
+| `config set` |  | ❌ |  |
+| `config set` | `--defaults` | ❌ |  |
+| `config set` | `--personal` | ❌ |  |
+| `config set` | `--bot` | ❌ |  |
+| `config unset` |  | ❌ |  |
+| `config unset` | `--defaults` | ❌ |  |
+| `config unset` | `--personal` | ❌ |  |
+| `config unset` | `--bot` | ❌ |  |
+| `config migrate` |  | ❌ |  |
+| `config repair` |  | ❌ |  |
+| `config repair` | `--dry-run` | ❌ |  |
 | `setup` |  | ⛔ | cli-core's setupCommand asks the flow's questions in a terminal; its setup-command tests drive that, and src/setup/flow.test.ts runs this flow through setup apply and setup run apply |
-| `setup show` |  | ✅ |  |
-| `setup apply` |  | ✅ |  |
-| `setup apply` | `--dry-run` | ✅ |  |
-| `setup run` |  | ✅ |  |
-| `setup run` | `--answer-stdin` | ✅ |  |
-| `runs list` |  | ✅ |  |
-| `runs list` | `--limit` | ✅ |  |
-| `runs list` | `--page` | ✅ |  |
-| `runs show` |  | ✅ |  |
-| `runs show` | `--problems` | ✅ |  |
-| `runs path` |  | ✅ |  |
-| `help` |  | ✅ |  |
+| `setup show` |  | ❌ |  |
+| `setup apply` |  | ❌ |  |
+| `setup apply` | `--dry-run` | ❌ |  |
+| `setup run` |  | ❌ |  |
+| `setup run` | `--answer-stdin` | ❌ |  |
+| `runs list` |  | ❌ |  |
+| `runs list` | `--limit` | ❌ |  |
+| `runs list` | `--page` | ❌ |  |
+| `runs show` |  | ❌ |  |
+| `runs show` | `--problems` | ❌ |  |
+| `runs path` |  | ❌ |  |
+| `help` |  | ❌ |  |
 | *global* | `--version` | ⛔ | Commander answers before any command runs, so the trace never sees it; `pnpm version:check` checks it |
-| *global* | `--verbose` | ✅ |  |
+| *global* | `--verbose` | ❌ |  |
 | *global* | `--json` | ✅ |  |
-| *global* | `--jsonl` | ✅ |  |
-| *global* | `--quiet` | ✅ |  |
-| *global* | `--trace` | ✅ |  |
-| *global* | `--debug` | ✅ |  |
-| *global* | `--timeout` | ✅ |  |
-| *global* | `--offline` | ✅ |  |
-| *global* | `--no-input` | ✅ |  |
-| *global* | `--max-input-bytes` | ✅ |  |
-| *global* | `--max-output-bytes` | ✅ |  |
-| *global* | `--brief` | ✅ |  |
-| *global* | `--full` | ✅ |  |
-| *global* | `--compact` | ✅ |  |
-| *global* | `--dry-run` | ✅ |  |
-| *global* | `--yes` | ✅ |  |
-| *global* | `--record` | ✅ |  |
-| *global* | `--no-record` | ✅ |  |
+| *global* | `--jsonl` | ❌ |  |
+| *global* | `--quiet` | ❌ |  |
+| *global* | `--trace` | ❌ |  |
+| *global* | `--debug` | ❌ |  |
+| *global* | `--timeout` | ❌ |  |
+| *global* | `--offline` | ❌ |  |
+| *global* | `--no-input` | ❌ |  |
+| *global* | `--max-input-bytes` | ❌ |  |
+| *global* | `--max-output-bytes` | ❌ |  |
+| *global* | `--brief` | ❌ |  |
+| *global* | `--full` | ❌ |  |
+| *global* | `--compact` | ❌ |  |
+| *global* | `--dry-run` | ❌ |  |
+| *global* | `--yes` | ❌ |  |
+| *global* | `--record` | ❌ |  |
+| *global* | `--no-record` | ❌ |  |
 | *global* | `--help-all` | ⛔ | Commander answers before any command runs, so the trace never sees it; contracts/help.snap covers help |
