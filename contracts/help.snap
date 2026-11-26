@@ -29,6 +29,7 @@ Works with:
   linear                                  Linear issues and projects, searchable with your other WireCat data
 
 Start here:   amo work session start --host https://example.amocrm.ru  (any profile name works)
+              amo session list                                         your profiles and their logged-in accounts
 Next:         amo commands                                             every command, by section
               amo guide                                                scenarios: command sequences for common tasks
               amo help options                                         output, offline, timeouts, dry run

@@ -27,6 +27,7 @@ import {
   type SignInSteps,
   secretInputOf,
   signInSteps,
+  storageOf,
   type TokenStorage,
 } from "@wirecat/cli-core/cli"
 import { refuseTakenCrmAccount } from "@wirecat/cli-core/crm/cli"
@@ -43,11 +44,6 @@ import { AMO_ACCOUNT } from "./account.js"
 const AMO = IDENTITY.command
 
 const answer = (command: Command, item: unknown) => renderAnswer(command, outputFor(command), itemOf(item))
-
-const storageOf = (raw: string): TokenStorage => {
-  if (raw === "keyring" || raw === "file") return raw
-  throw new CliError("validation_error", `--credential-storage takes keyring or file; got ${raw}`)
-}
 
 const tokensHere = (env: NodeJS.ProcessEnv, keyring: KeyringStore | undefined) =>
   new ProfileTokenStore({ app: IDENTITY, env, ...(keyring ? { keyring } : {}) })

@@ -1,6 +1,13 @@
 import { CliError, isCliError, realSleep, type SleepLike } from "@wirecat/cli-base"
 import { type FetchLike, hostFetch, providerWaitMs, readJsonResponse } from "@wirecat/cli-base/http"
-import { apiJson, currentAttempt, type EventSink, providerEvent, providerRequest } from "@wirecat/cli-core/cli"
+import {
+  apiJson,
+  currentAttempt,
+  type EventSink,
+  providerEvent,
+  providerRequest,
+  timeLimit,
+} from "@wirecat/cli-core/cli"
 import { providerCall } from "@wirecat/cli-core/crm"
 import type { Pacer, TurnOptions } from "@wirecat/cli-core/sends"
 import { type EmployeeRule, employeeRuleOf } from "../api-keys.js"
@@ -209,13 +216,7 @@ export class AmoTransport {
 
   async #once(route: Matched, request: AmoRequest, write: boolean, attempt: number): Promise<AmoAnswer> {
     const { operation } = route
-    // Not AbortSignal.timeout: its timer holds the run's async context until the deadline (tg-cli, 2026-11-05).
-    const deadline = new AbortController()
-    const timer = setTimeout(
-      () => deadline.abort(new DOMException(`${operation.name} timed out`, "TimeoutError")),
-      this.#timeoutMs,
-    )
-    timer.unref()
+    const deadline = timeLimit(this.#timeoutMs)
     const end = providerRequest(operation.name, this.#events ?? providerEvent, {
       method: operation.method,
       endpointTemplate: operation.template,
@@ -234,7 +235,7 @@ export class AmoTransport {
       end({ status: response.status })
       return { status: response.status, body }
     } finally {
-      clearTimeout(timer)
+      deadline.clear()
     }
   }
 
