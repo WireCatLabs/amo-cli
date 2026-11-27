@@ -2,6 +2,22 @@
 
 Notable changes to `@wirecat/amo-cli`. One section per version, newest first.
 
+## 0.6.0 — 27.11.2026
+
+### Changed — may break callers
+
+- **amo is built on cli-core 2.0.0.** After its first run the store is at version 78, and only tools on cli-core 2.0
+  open it: upgrade every WireCat CLI and WireCat Desktop on this computer together, and stop `serve`, `mcp` and syncs
+  while it migrates. The migration keeps a rollback copy first. In `--json`, an agent that wrote a deal's task or
+  note is `type: "agent"` where it was `"bot"`, and a sender bot ref is `bot:<id>` where it was `sender-bot:<id>`.
+
+### Fixed
+
+- **A store another process holds is `store.busy`, not a crash** (`@wirecat/cli-core` 1.3.0). When a scheduled sync
+  of one profile kept the write lock, a second run failed with SQLite's raw `database is locked` as a bug. It now
+  answers `conflict` (exit 15) with the reason `store.busy`.
+- The first help screen names `amo session list` (cli-core 1.3.0).
+
 ## 0.5.0 — 25.11.2026
 
 ### Added
