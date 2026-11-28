@@ -29,10 +29,14 @@ export const DESKTOP: ManifestIdentity = {
   userHosts: "the amoCRM or Kommo account you sign in to, such as example.amocrm.ru",
   tagline: "amoCRM and Kommo CRM: deals, contacts and companies",
   syncs: "your deals, contacts and companies",
+  mcpPort: 8761,
   signIn: {
     gives:
       "Lets your agent read and change the account's CRM with the rights of the administrator who made the token, or of the user who signed in through your own integration.",
     asks: "The account's address and a long-lived token from a private integration's Keys and scopes tab, or that integration's ID and secret key.",
+    methods: [
+      { id: "token", label: "Long-lived token", words: ["{profile}", "session", "start", "--json"], stdin: true },
+    ],
   },
 }
 
