@@ -1260,6 +1260,19 @@
     "signIn": {
       "gives": "Lets your agent read and change the account's CRM with the rights of the administrator who made the token, or of the user who signed in through your own integration.",
       "asks": "The account's address and a long-lived token from a private integration's Keys and scopes tab, or that integration's ID and secret key.",
+      "methods": [
+        {
+          "id": "token",
+          "label": "Long-lived token",
+          "words": [
+            "{profile}",
+            "session",
+            "start",
+            "--json"
+          ],
+          "stdin": true
+        }
+      ],
       "setupFrom": "0.0.0"
     },
     "skill": {
@@ -1284,6 +1297,7 @@
       ]
     },
     "mcpServer": {
+      "port": 8761,
       "start": [
         "mcp",
         "server",
